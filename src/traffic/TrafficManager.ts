@@ -231,32 +231,25 @@ export class TrafficManager {
   ): void {
     const cfg = TRAFFIC_CAR_CONFIGS[car.type];
 
-    // Shadow
-    g.fillStyle(0x000000, 0.4);
-    g.fillEllipse(cx, cy + ch * 0.55, cw * 1.1, ch * 0.3);
+    // Traffic is a grounded, dark hazard vehicle: intentionally unlike the
+    // bright diamond-shaped power-ups.
+    g.fillStyle(0x000000, 0.55);
+    g.fillEllipse(cx, cy + ch * 0.55, cw * 1.25, ch * 0.38);
+    g.fillStyle(0x10101c, 1);
+    g.fillRoundedRect(cx - cw * 0.48, cy - ch * 0.48, cw * 0.96, ch * 0.98, Math.max(2, cw * 0.08));
+    g.lineStyle(Math.max(1, cw * 0.06), 0xff3355, 0.95);
+    g.strokeRoundedRect(cx - cw * 0.48, cy - ch * 0.48, cw * 0.96, ch * 0.98, Math.max(2, cw * 0.08));
 
-    // Body
-    g.fillStyle(car.color, 1);
-    g.fillRect(cx - cw * 0.45, cy - ch * 0.45, cw * 0.9, ch * 0.9);
-
-    // Roof (darker)
-    g.fillStyle(car.color, 0.6);
-    g.fillRect(cx - cw * 0.28, cy - ch * 0.42, cw * 0.56, ch * 0.45);
-
-    // Headlights (front = top since top-down)
-    g.fillStyle(car.accentColor, 1);
-    g.fillRect(cx - cw * 0.38, cy - ch * 0.5, cw * 0.14, ch * 0.12);
-    g.fillRect(cx + cw * 0.24, cy - ch * 0.5, cw * 0.14, ch * 0.12);
-
-    // Neon glow around headlights
-    g.fillStyle(car.accentColor, 0.3);
-    g.fillCircle(cx - cw * 0.31, cy - ch * 0.44, cw * 0.12);
-    g.fillCircle(cx + cw * 0.31, cy - ch * 0.44, cw * 0.12);
-
-    // Tail lights (bottom = back since top-down)
-    g.fillStyle(0xff2200, 1);
-    g.fillRect(cx - cw * 0.38, cy + ch * 0.38, cw * 0.12, ch * 0.1);
-    g.fillRect(cx + cw * 0.26, cy + ch * 0.38, cw * 0.12, ch * 0.1);
+    // Orange warning chevrons and red lamps make collision objects readable.
+    const stripeColor = car.type === 'fast' ? 0xffff00 : 0xff7711;
+    g.fillStyle(stripeColor, 0.95);
+    g.fillTriangle(cx - cw * 0.32, cy - ch * 0.14, cx - cw * 0.08, cy - ch * 0.14, cx - cw * 0.20, cy + ch * 0.20);
+    g.fillTriangle(cx + cw * 0.08, cy - ch * 0.14, cx + cw * 0.32, cy - ch * 0.14, cx + cw * 0.20, cy + ch * 0.20);
+    g.fillStyle(0xff1133, 1);
+    g.fillCircle(cx - cw * 0.31, cy + ch * 0.34, Math.max(2, cw * 0.09));
+    g.fillCircle(cx + cw * 0.31, cy + ch * 0.34, Math.max(2, cw * 0.09));
+    g.fillStyle(0xffffff, 0.55);
+    g.fillRect(cx - cw * 0.18, cy - ch * 0.36, cw * 0.36, Math.max(1, ch * 0.08));
   }
 
   getActiveCars(): TrafficCar[] {

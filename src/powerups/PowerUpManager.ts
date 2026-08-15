@@ -193,28 +193,24 @@ export class PowerUpManager {
       const pulse = Math.sin(t * 3 + pu.id) * 0.3 + 1;
       const r = baseR * pulse;
 
-      // Outer glow
-      g.fillStyle(cfg.color, 0.25);
-      g.fillCircle(pos.x, pos.y, r * 2.5);
-
-      // Mid glow
-      g.fillStyle(cfg.glowColor, 0.4);
-      g.fillCircle(pos.x, pos.y, r * 1.6);
-
-      // Core orb
+      // Power-ups are floating diamonds, deliberately unlike the grounded
+      // rectangular traffic hazards.
+      g.fillStyle(cfg.color, 0.20);
+      g.fillCircle(pos.x, pos.y, r * 2.3);
+      const diamond = [
+        { x: pos.x, y: pos.y - r * 1.3 },
+        { x: pos.x + r, y: pos.y },
+        { x: pos.x, y: pos.y + r * 1.3 },
+        { x: pos.x - r, y: pos.y },
+      ];
       g.fillStyle(cfg.color, 1);
-      g.fillCircle(pos.x, pos.y, r);
+      g.fillPoints(diamond, true);
+      g.lineStyle(Math.max(1, baseR * 0.18), 0xffffff, 0.95);
+      g.strokePoints(diamond, true);
+      g.fillStyle(cfg.glowColor, 0.95);
+      g.fillCircle(pos.x, pos.y, Math.max(2, r * 0.28));
 
-      // Inner bright
-      g.fillStyle(0xffffff, 0.7);
-      g.fillCircle(pos.x - r * 0.2, pos.y - r * 0.2, r * 0.3);
-
-      // Rotating ring
-      g.lineStyle(Math.max(1, baseR * 0.2), cfg.glowColor, 0.8);
-      g.strokeCircle(pos.x, pos.y, r * 1.1);
-
-      // Icon (text drawn via existing text objects is complex, use a dot pattern instead)
-      // Rotating orbit particles
+      // Orbiting fragments sell the pickup as an energy item, not an obstacle.
       for (let i = 0; i < 3; i++) {
         const a = t * 2 + (i / 3) * Math.PI * 2;
         const ox = pos.x + Math.cos(a) * r * 1.5;

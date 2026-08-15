@@ -358,6 +358,9 @@ export class Player {
 
   /** Called when player hits something */
   triggerCrash(fromBarrier = false): void {
+    // Traffic can overlap for several frames; only the first impact should
+    // trigger hit-stop and the crash flash.
+    if (this.crashed) return;
     if (this.invincible) return;
     if (this.shieldActive) {
       this.shieldActive = false;

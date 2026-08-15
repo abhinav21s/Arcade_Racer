@@ -219,6 +219,16 @@ export class RoadRenderer {
         { x: topX - topW, y: clampedTop },
       ], true, true);
 
+      // A darker asphalt core makes the roadway readable independently of the
+      // neon shoulders, especially at high speed.
+      g.fillStyle(0x090b20, 0.38);
+      g.fillPoints([
+        { x: botX - botW * 0.80, y: bottomY },
+        { x: botX + botW * 0.80, y: bottomY },
+        { x: topX + topW * 0.80, y: clampedTop },
+        { x: topX - topW * 0.80, y: clampedTop },
+      ], true, true);
+
       // ---- Rumble strips (neon glowing edges) ----
       const rumbleNear = botW * 0.11;
       const rumbleFar  = topW * 0.11;
@@ -240,12 +250,12 @@ export class RoadRenderer {
 
       // ---- Lane markings (alternating dash pattern) ----
       const segIdx = cameraSegIdx + i;
-      if (Math.floor(segIdx / 3) % 2 === 0) {
-        g.fillStyle(seg.colors.lane, 0.7);
+      if (Math.floor(segIdx / 2) % 2 === 0) {
+        g.fillStyle(0xd8e8ff, 0.88);
         for (let lane = 1; lane < NUM_LANES; lane++) {
           const fraction = (lane / NUM_LANES) * 2 - 1;  // -1 to 1
-          const markWNear = Math.max(botW * 0.018, 1);
-          const markWFar  = Math.max(topW * 0.018, 1);
+          const markWNear = Math.max(botW * 0.028, 2);
+          const markWFar  = Math.max(topW * 0.028, 1);
           const mXNear = botX + fraction * botW;
           const mXFar  = topX + fraction * topW;
           g.fillPoints([
@@ -254,8 +264,15 @@ export class RoadRenderer {
             { x: mXFar  + markWFar,  y: clampedTop },
             { x: mXFar  - markWFar,  y: clampedTop },
           ], true, true);
+          g.lineStyle(Math.max(1, markWNear * 0.25), COLORS.NEON_CYAN, 0.55);
+          g.lineBetween(mXNear, bottomY, mXFar, clampedTop);
         }
       }
+
+      // High contrast outlines keep the road edge visible through the scenery.
+      g.lineStyle(Math.max(1, rumbleNear * 0.14), 0xffffff, 0.45);
+      g.lineBetween(botX - botW + rumbleNear * 0.45, bottomY, topX - topW + rumbleFar * 0.45, clampedTop);
+      g.lineBetween(botX + botW - rumbleNear * 0.45, bottomY, topX + topW - rumbleFar * 0.45, clampedTop);
 
       // ---- Neon barrier edges (far sections) ----
       if (i > DRAW_LENGTH * 0.3) {

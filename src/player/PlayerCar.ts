@@ -9,8 +9,8 @@ import { lerp } from '../utils/Math';
 import { PowerUpType } from '../powerups/PowerUpTypes';
 
 const PLAYER_Y = GAME_HEIGHT * 0.76;  // Car Y on screen (fixed)
-const CAR_W = 64;
-const CAR_H = 32;
+const CAR_W = 78;
+const CAR_H = 42;
 
 export class PlayerCar {
   private scene:   Phaser.Scene;
@@ -193,6 +193,16 @@ export class PlayerCar {
       { x: cx - w * 0.38 + leanOffset, y: cy + h * 0.45 },
     ];
     g.fillPoints(bodyPts, true);
+    g.lineStyle(2, 0xffffff, 0.32);
+    g.strokePoints(bodyPts, true);
+
+    // Wide wheel arches and tires make the player read as a low-slung racer.
+    g.fillStyle(0x05050d, 1);
+    g.fillRoundedRect(cx - w * 0.53 + leanOffset, cy - h * 0.03, w * 0.16, h * 0.42, 3);
+    g.fillRoundedRect(cx + w * 0.37 + leanOffset, cy - h * 0.03, w * 0.16, h * 0.42, 3);
+    g.fillStyle(COLORS.NEON_CYAN, 0.45);
+    g.fillRect(cx - w * 0.49 + leanOffset, cy + h * 0.08, w * 0.05, h * 0.2);
+    g.fillRect(cx + w * 0.44 + leanOffset, cy + h * 0.08, w * 0.05, h * 0.2);
 
     // Hood (front, slimmer)
     g.fillStyle(color, 0.8);
@@ -214,6 +224,16 @@ export class PlayerCar {
     ];
     g.fillPoints(windPts, true);
 
+    // Canopy frame, hood stripe, and rear spoiler add readable supercar detail.
+    g.lineStyle(2, COLORS.NEON_CYAN, 0.75);
+    g.strokePoints(windPts, true);
+    g.fillStyle(0xffffff, 0.28);
+    g.fillRect(cx - w * 0.035 + leanOffset, cy - h * 0.08, w * 0.07, h * 0.48);
+    g.fillStyle(0x070714, 1);
+    g.fillRoundedRect(cx - w * 0.47 + leanOffset, cy + h * 0.36, w * 0.94, h * 0.10, 2);
+    g.lineStyle(2, color, 0.95);
+    g.lineBetween(cx - w * 0.48 + leanOffset, cy + h * 0.34, cx + w * 0.48 + leanOffset, cy + h * 0.34);
+
     // Headlights (neon glow)
     const lightColor = boost ? COLORS.NEON_YELLOW : COLORS.NEON_CYAN;
     g.fillStyle(lightColor, 1);
@@ -228,6 +248,13 @@ export class PlayerCar {
     g.fillStyle(tailColor, 1);
     g.fillRect(cx - w * 0.4 + leanOffset, cy + h * 0.35, 10, 5);
     g.fillRect(cx + w * 0.28 + leanOffset, cy + h * 0.35, 10, 5);
+
+    // Rear diffuser and exhaust ports.
+    g.fillStyle(0x05050d, 1);
+    g.fillRect(cx - w * 0.24 + leanOffset, cy + h * 0.39, w * 0.48, h * 0.11);
+    g.fillStyle(COLORS.NEON_ORANGE, boost ? 1 : 0.55);
+    g.fillCircle(cx - w * 0.12 + leanOffset, cy + h * 0.45, 3);
+    g.fillCircle(cx + w * 0.12 + leanOffset, cy + h * 0.45, 3);
 
     // Neon side strips
     g.lineStyle(2, color, 0.9);

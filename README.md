@@ -2,6 +2,8 @@
 
 A blazing-fast OutRun-style pseudo-3D arcade racer built with **Phaser 3 + TypeScript + Vite**.
 
+Play it online: [arcade-racer-jade.vercel.app](https://arcade-racer-jade.vercel.app/)
+
 ## Controls
 
 | Key | Action |

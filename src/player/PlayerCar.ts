@@ -8,7 +8,7 @@ import { CAR_SKINS, COLORS, GAME_WIDTH, GAME_HEIGHT } from '../constants';
 import { lerp } from '../utils/Math';
 import { PowerUpType } from '../powerups/PowerUpTypes';
 
-const PLAYER_Y = GAME_HEIGHT * 0.76;  // Car Y on screen (fixed)
+const PLAYER_Y = GAME_HEIGHT * 0.76;  // Fallback before the road has rendered
 const CAR_W = 78;
 const CAR_H = 42;
 
@@ -33,6 +33,7 @@ export class PlayerCar {
   private speedLineGfx: Phaser.GameObjects.Graphics;
 
   private lastX = GAME_WIDTH / 2;
+  private lastY = PLAYER_Y;
   private flickerTimer = 0;
 
   constructor(scene: Phaser.Scene, player: Player) {
@@ -49,10 +50,14 @@ export class PlayerCar {
     this.chromaB     = scene.add.graphics().setDepth(50).setAlpha(0);
   }
 
-  update(dt: number, roadRenderer: { getPlayerScreenX: (lat: number, d: number) => number }): void {
+  update(dt: number, roadRenderer: {
+    getPlayerScreenX: (lat: number, d: number) => number;
+    getPlayerScreenY: (d: number) => number;
+  }): void {
     const skin = CAR_SKINS[this.player.skinIndex] ?? CAR_SKINS[0];
-    const carX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 2);
-    const carY = PLAYER_Y;
+    // Use the same projected road point for X and Y, anchoring the tires to tar.
+    const carX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 8);
+    const carY = roadRenderer.getPlayerScreenY(8) - CAR_H * 0.32;
 
     // ---- Trail ----
     this.updateTrail(dt, carX, carY, skin.trailColor);
@@ -73,6 +78,7 @@ export class PlayerCar {
     this.drawChromatic(dt, carX, carY, skin.carColor);
 
     this.lastX = carX;
+    this.lastY = carY;
     this.flickerTimer += dt;
   }
 
@@ -337,7 +343,7 @@ export class PlayerCar {
   }
 
   getCarX(): number { return this.lastX; }
-  getCarY(): number { return PLAYER_Y; }
+  getCarY(): number { return this.lastY; }
 
   destroy(): void {
     this.gfx.destroy();

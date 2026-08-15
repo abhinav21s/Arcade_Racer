@@ -221,7 +221,7 @@ export class RoadRenderer {
 
       // A darker asphalt core makes the roadway readable independently of the
       // neon shoulders, especially at high speed.
-      g.fillStyle(0x090b20, 0.38);
+      g.fillStyle(0x000000, 0.42);
       g.fillPoints([
         { x: botX - botW * 0.80, y: bottomY },
         { x: botX + botW * 0.80, y: bottomY },
@@ -251,7 +251,7 @@ export class RoadRenderer {
       // ---- Lane markings (alternating dash pattern) ----
       const segIdx = cameraSegIdx + i;
       if (Math.floor(segIdx / 2) % 2 === 0) {
-        g.fillStyle(0xd8e8ff, 0.88);
+        g.fillStyle(0xf4f7ff, 0.94);
         for (let lane = 1; lane < NUM_LANES; lane++) {
           const fraction = (lane / NUM_LANES) * 2 - 1;  // -1 to 1
           const markWNear = Math.max(botW * 0.028, 2);
@@ -397,6 +397,12 @@ export class RoadRenderer {
     const p = this.projPoints[depthIdx];
     if (!p) return GAME_WIDTH / 2;
     return Math.round(p.x + playerLateral * p.w);
+  }
+
+  /** Road-plane Y at the player anchor point, so the car never appears to float. */
+  getPlayerScreenY(depthIdx: number = 8): number {
+    const p = this.projPoints[depthIdx];
+    return p ? p.y : GAME_HEIGHT * 0.8;
   }
 
   /** Return road width (half) at player depth for collision/display */

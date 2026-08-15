@@ -21,10 +21,10 @@ export const COLORS = {
   SKY_TOP:        0x050510,
   SKY_BOTTOM:     0x0d0030,
   // Road alternating stripes
-  GRASS_A:        0x051a0d,
-  GRASS_B:        0x071f10,
-  ROAD_A:         0x1a0040,
-  ROAD_B:         0x150038,
+  GRASS_A:        0x06130f,
+  GRASS_B:        0x091814,
+  ROAD_A:         0x12141b,   // black asphalt
+  ROAD_B:         0x0b0d13,   // alternating tar shade
   RUMBLE_A:       0xff00cc,   // magenta
   RUMBLE_B:       0x00ccff,   // cyan
   LANE_MARK:      0x442266,   // dim purple dash
@@ -131,4 +131,3 @@ export const SCENE = {
   GAME:      'GameScene',
   GAME_OVER: 'GameOverScene',
 };
-

@@ -21,8 +21,8 @@ import { randFloat, randInt, randItem } from '../utils/Math';
 
 const LANE_POSITIONS = [-0.75, -0.25, 0.25, 0.75]; // 4 lanes
 const MAX_ACTIVE = 5;
-const SPAWN_DIST_MIN = SEGMENT_LENGTH * 30;
-const SPAWN_DIST_MAX = SEGMENT_LENGTH * 80;
+const SPAWN_DIST_MIN = SEGMENT_LENGTH * 8;
+const SPAWN_DIST_MAX = SEGMENT_LENGTH * 22;
 
 export class PowerUpManager {
   private scene:   Phaser.Scene;

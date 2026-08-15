@@ -23,7 +23,7 @@ import { randFloat, randInt, randItem } from '../utils/Math';
 import { PowerUpType } from '../powerups/PowerUpTypes';
 
 const CAR_TYPES: TrafficCarType[] = ['slow', 'mid', 'fast'];
-const SPAWN_DISTANCE_AHEAD = DRAW_LENGTH * SEGMENT_LENGTH * 0.75; // Spawn 75% of draw distance ahead
+const SPAWN_DISTANCE_AHEAD = SEGMENT_LENGTH * 14; // 2,800 units: reachable in seconds, not a minute
 const RECYCLE_BEHIND = -SEGMENT_LENGTH * 8;  // Recycle when this far behind camera
 
 export class TrafficManager {
@@ -35,7 +35,6 @@ export class TrafficManager {
 
   private spawnTimer   = 0;
   private spawnInterval= 1.8; // seconds; decreases with speed
-  private lastSpawnLane = 1;
 
   constructor(scene: Phaser.Scene, emitter: Phaser.Events.EventEmitter) {
     this.scene   = scene;
@@ -77,45 +76,18 @@ export class TrafficManager {
 
     const type   = randItem(CAR_TYPES);
     const cfg    = TRAFFIC_CAR_CONFIGS[type];
-    // Alternate lanes at speed so traffic creates readable routes rather than
-    // a stream of unrelated obstacles.
-    const lane = speedFraction > 0.4
-      ? (this.lastSpawnLane + randInt(1, 3)) % 4
-      : randInt(0, 3);
+    // Fully random lane and depth placement keeps hazards from reading as a line.
+    const lane = randInt(0, 3);
     car.type         = type;
     car.lane         = lane;
     car.lateralPos   = laneTolateralPos(lane);
-    car.worldZ       = cameraZ + SPAWN_DISTANCE_AHEAD * (0.5 + Math.random() * 0.5);
+    car.worldZ       = cameraZ + SPAWN_DISTANCE_AHEAD * (0.40 + Math.random() * 0.60);
     car.speed        = randFloat(cfg.speedMin, cfg.speedMax);
     car.active       = true;
     car.nearMissScored = false;
     car.carWidth     = cfg.carWidth;
     car.color        = cfg.color;
     car.accentColor  = cfg.accentColor;
-    this.lastSpawnLane = lane;
-
-    // At racing speed, occasional two-car gates leave one deliberate escape
-    // lane. This creates a choice: line up early, drift through, or boost.
-    if (speedFraction > 0.68 && Math.random() < 0.32) {
-      const partner = this.getInactiveCar();
-      if (partner) {
-        const partnerType = randItem(CAR_TYPES);
-        const partnerCfg = TRAFFIC_CAR_CONFIGS[partnerType];
-        const safeLane = (lane + 2) % 4;
-        let partnerLane = (lane + (Math.random() < 0.5 ? 1 : 3)) % 4;
-        if (partnerLane === safeLane) partnerLane = (partnerLane + 1) % 4;
-        partner.type = partnerType;
-        partner.lane = partnerLane;
-        partner.lateralPos = laneTolateralPos(partnerLane);
-        partner.worldZ = car.worldZ + randFloat(-SEGMENT_LENGTH * 0.18, SEGMENT_LENGTH * 0.18);
-        partner.speed = randFloat(partnerCfg.speedMin, partnerCfg.speedMax);
-        partner.active = true;
-        partner.nearMissScored = false;
-        partner.carWidth = partnerCfg.carWidth;
-        partner.color = partnerCfg.color;
-        partner.accentColor = partnerCfg.accentColor;
-      }
-    }
   }
 
   update(dt: number, player: Player, worldTimeScale = 1): void {

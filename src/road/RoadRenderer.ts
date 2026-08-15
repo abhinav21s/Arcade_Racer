@@ -230,8 +230,9 @@ export class RoadRenderer {
       ], true, true);
 
       // ---- Rumble strips (neon glowing edges) ----
-      const rumbleNear = botW * 0.11;
-      const rumbleFar  = topW * 0.11;
+      // Thin neon shoulders keep most of the screen readable as asphalt.
+      const rumbleNear = botW * 0.055;
+      const rumbleFar  = topW * 0.055;
       g.fillStyle(seg.colors.rumble, 1);
       // Left
       g.fillPoints([
@@ -248,11 +249,12 @@ export class RoadRenderer {
         { x: topX + topW - rumbleFar,  y: clampedTop },
       ], true, true);
 
-      // ---- Lane markings (alternating dash pattern) ----
+      // ---- Highway markings: white dashed lane dividers + double yellow centre ----
       const segIdx = cameraSegIdx + i;
       if (Math.floor(segIdx / 2) % 2 === 0) {
         g.fillStyle(0xf4f7ff, 0.94);
         for (let lane = 1; lane < NUM_LANES; lane++) {
+          if (lane === NUM_LANES / 2) continue; // replaced by double-yellow lines below
           const fraction = (lane / NUM_LANES) * 2 - 1;  // -1 to 1
           const markWNear = Math.max(botW * 0.028, 2);
           const markWFar  = Math.max(topW * 0.028, 1);
@@ -268,6 +270,17 @@ export class RoadRenderer {
           g.lineBetween(mXNear, bottomY, mXFar, clampedTop);
         }
       }
+
+      // Continuous double-yellow centre line: a familiar road cue, rendered in neon.
+      const centerGapNear = Math.max(botW * 0.026, 3);
+      const centerGapFar  = Math.max(topW * 0.026, 1);
+      const yellowWidthNear = Math.max(botW * 0.010, 1.5);
+      g.lineStyle(yellowWidthNear * 2.2, COLORS.NEON_YELLOW, 0.28);
+      g.lineBetween(botX - centerGapNear, bottomY, topX - centerGapFar, clampedTop);
+      g.lineBetween(botX + centerGapNear, bottomY, topX + centerGapFar, clampedTop);
+      g.lineStyle(yellowWidthNear, 0xffee55, 1);
+      g.lineBetween(botX - centerGapNear, bottomY, topX - centerGapFar, clampedTop);
+      g.lineBetween(botX + centerGapNear, bottomY, topX + centerGapFar, clampedTop);
 
       // High contrast outlines keep the road edge visible through the scenery.
       g.lineStyle(Math.max(1, rumbleNear * 0.14), 0xffffff, 0.45);

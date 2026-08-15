@@ -45,12 +45,12 @@ export const COLORS = {
 // ---- Player Physics ----
 export const PLAYER_MAX_SPEED       = 320;   // World units / second (max)
 export const PLAYER_BOOST_SPEED     = 500;   // Speed during nitro/overdrive
-export const PLAYER_ACCEL           = 0.6;   // 0-1 lerp factor per second
-export const PLAYER_DECEL           = 0.3;   // Braking decel factor
-export const PLAYER_COAST_FACTOR    = 0.15;  // Natural speed decay
-export const STEER_FORCE            = 1.8;   // Lateral movement force
-export const STEER_DRIFT_FORCE      = 2.8;   // Lateral force while drifting
-export const ROAD_CURVE_PUSH        = 0.8;   // How much curve pushes car off-center
+export const PLAYER_ACCEL           = 760;   // World units / sec² — immediate arcade response
+export const PLAYER_DECEL           = 1050;  // Braking force (world units / sec²)
+export const PLAYER_COAST_FACTOR    = 115;   // Natural speed loss (world units / sec²)
+export const STEER_FORCE            = 2.85;  // Direct lateral response
+export const STEER_DRIFT_FORCE      = 5.1;   // Lateral force while drifting
+export const ROAD_CURVE_PUSH        = 1.05;  // Curves require active counter-steering
 export const OFF_ROAD_SPEED_PENALTY = 0.6;   // Speed multiplier when off road
 export const MIN_DRIFT_SPEED        = 0.45;  // Fraction of max speed to allow drift
 export const DRIFT_LEAN_MAX         = 0.30;  // Max visual lean (degrees factor)
@@ -58,8 +58,8 @@ export const DRIFT_LEAN_MAX         = 0.30;  // Max visual lean (degrees factor)
 // ---- Traffic ----
 export const TRAFFIC_SPAWN_INTERVAL = 1.2;   // Seconds between spawns at base speed
 export const TRAFFIC_POOL_SIZE      = 30;
-export const NEAR_MISS_LATERAL_MIN  = 0.08;  // Min lateral gap for near-miss (road fraction)
-export const NEAR_MISS_LATERAL_MAX  = 0.22;  // Max lateral gap for near-miss
+export const NEAR_MISS_LATERAL_MIN  = 0.035; // Generous close-pass window
+export const NEAR_MISS_LATERAL_MAX  = 0.34;  // Max lateral gap for near-miss
 export const COLLISION_LATERAL      = 0.07;  // Lateral gap for collision
 
 // ---- Power-ups ----
@@ -131,5 +131,4 @@ export const SCENE = {
   GAME:      'GameScene',
   GAME_OVER: 'GameOverScene',
 };
-
 

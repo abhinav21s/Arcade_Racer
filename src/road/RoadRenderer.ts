@@ -33,6 +33,8 @@ export class RoadRenderer {
   private skyGfx:       Phaser.GameObjects.Graphics; // sky background
   private spriteLayer:  Phaser.GameObjects.Container;
   private cityLayer:    Phaser.GameObjects.Graphics; // neon city silhouette
+  private cameraLagX = 0;
+  private cameraZoom = 1;
 
   // Projected points buffer (re-used every frame)
   private projPoints: ProjectedPoint[] = new Array(DRAW_LENGTH + 2);
@@ -142,6 +144,13 @@ export class RoadRenderer {
 
     generator.ensureAvailable(cameraSegIdx, DRAW_LENGTH + 5);
 
+    // A small delayed lateral follow and speed zoom makes the road feel attached to
+    // the car without moving the HUD or introducing input latency.
+    const targetLagX = -playerLateral * 72;
+    this.cameraLagX = lerp(this.cameraLagX, targetLagX, 0.10);
+    const targetZoom = 1 + Math.min(speedFraction, 1.55) * 0.09;
+    this.cameraZoom = lerp(this.cameraZoom, targetZoom, 0.07);
+
     // ---- First Pass: Accumulate curve/hill and project ----
     let accumCurve = 0;  // Accumulated lateral curve offset (world units)
     let accumHill  = 0;  // Accumulated vertical hill offset
@@ -159,9 +168,11 @@ export class RoadRenderer {
       const scale = CAMERA_DEPTH / depth;
       // Road center offset from camera X = (accumulated curve) - (player lateral in world)
       const roadCenterX = accumCurve - playerLateral * ROAD_WIDTH;
-      const screenX = Math.round(W / 2 + scale * roadCenterX * (W / 2));
-      const screenY = Math.round(H / 2 + scale * (CAMERA_HEIGHT - accumHill) * (H / 2));
-      const screenHW = Math.round(scale * ROAD_WIDTH * (W / 2));
+      const baseX = W / 2 + scale * roadCenterX * (W / 2);
+      const baseY = H / 2 + scale * (CAMERA_HEIGHT - accumHill) * (H / 2);
+      const screenX = Math.round(W / 2 + (baseX - W / 2) * this.cameraZoom + this.cameraLagX);
+      const screenY = Math.round(HORIZON_Y + (baseY - HORIZON_Y) * this.cameraZoom);
+      const screenHW = Math.round(scale * ROAD_WIDTH * (W / 2) * this.cameraZoom);
 
       this.projPoints[i] = { x: screenX, y: screenY, w: screenHW, scale };
 

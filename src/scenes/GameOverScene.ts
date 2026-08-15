@@ -225,10 +225,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private restart(): void {
-    this.cameras.main.flash(200, 0, 255, 255);
-    this.time.delayedCall(200, () => {
-      this.scene.start(SCENE.GAME, { skinId: this.skinId });
-    });
+    this.scene.start(SCENE.GAME, { skinId: this.skinId });
   }
 
   private goMenu(): void {

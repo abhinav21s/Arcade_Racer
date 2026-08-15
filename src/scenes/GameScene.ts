@@ -295,8 +295,8 @@ export class GameScene extends Phaser.Scene {
     checkAndUnlockSkins(score);
 
     // Transition
-    this.cameras.main.fade(500, 0, 0, 0);
-    this.time.delayedCall(500, () => {
+    this.cameras.main.fade(180, 0, 0, 0);
+    this.time.delayedCall(180, () => {
       this.audio.destroy();
       this.scene.start(SCENE.GAME_OVER, {
         score: Math.floor(score),

@@ -58,7 +58,8 @@ export class ScreenEffects {
 
   /** Call on player crash */
   triggerCrashShake(): void {
-    this.cam.shake(350, 0.018);
+    this.cam.shake(420, 0.026);
+    this.cam.flash(110, 255, 70, 110, false);
   }
 
   /** Call on big boost start */
@@ -73,7 +74,8 @@ export class ScreenEffects {
 
   /** Call on near-miss */
   triggerNearMissShake(): void {
-    this.cam.shake(80, 0.004);
+    this.cam.shake(110, 0.007);
+    this.cam.flash(55, 0, 220, 255, false);
   }
 
   update(dt: number, player: Player): void {

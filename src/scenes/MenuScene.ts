@@ -11,6 +11,7 @@ export class MenuScene extends Phaser.Scene {
   private bgGfx!:    Phaser.GameObjects.Graphics;
   private titleTxt!: Phaser.GameObjects.Text;
   private startTxt!: Phaser.GameObjects.Text;
+  private startButtonGfx!: Phaser.GameObjects.Graphics;
   private hsTxt!:    Phaser.GameObjects.Text[];
   private skinGfxs!: Phaser.GameObjects.Graphics[];
   private skinTxts!: Phaser.GameObjects.Text[];
@@ -152,6 +153,13 @@ export class MenuScene extends Phaser.Scene {
       const y        = 250;
 
       const gfx = this.add.graphics().setDepth(7);
+      gfx.setInteractive(new Phaser.Geom.Rectangle(x - 58, y - 35, 116, 85), Phaser.Geom.Rectangle.Contains);
+      gfx.on('pointerdown', () => {
+        if (!unlocked) return;
+        this.selectedSkinIdx = this.unlockedSkins.indexOf(skin.id);
+        this.updateSkinHighlight();
+      });
+      gfx.on('pointerover', () => { if (unlocked) gfx.setAlpha(1); });
       this.skinGfxs.push(gfx);
 
       const txt = this.add.text(x, y + 60, unlocked ? skin.name : '???\n' + skin.unlockScore.toLocaleString() + ' pts', {
@@ -173,6 +181,14 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: 'Orbitron, monospace', fontSize: '24px', color: '#334466',
     }).setOrigin(0.5, 0.5).setDepth(7);
 
+    this.add.text(GAME_WIDTH / 2, 335, 'UNLOCK NEW RIDES: 10K  •  25K  •  50K  •  100K SCORE', {
+      fontFamily: 'Rajdhani, monospace',
+      fontSize: '14px',
+      color: '#aa88ff',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5, 0).setDepth(7);
+
     this.updateSkinHighlight();
   }
 
@@ -187,6 +203,12 @@ export class MenuScene extends Phaser.Scene {
 
     // Card background
     const bgAlpha = selected ? 0.25 : 0.1;
+    if (selected) {
+      gfx.fillStyle(carColor, 0.10);
+      gfx.fillRoundedRect(x - w / 2 - 10, y - h / 2 - 10, w + 20, h + 20, 10);
+      gfx.lineStyle(3, trailColor, 0.35);
+      gfx.strokeRoundedRect(x - w / 2 - 6, y - h / 2 - 6, w + 12, h + 12, 8);
+    }
     gfx.fillStyle(selected ? carColor : 0x334466, bgAlpha);
     gfx.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
 
@@ -221,10 +243,11 @@ export class MenuScene extends Phaser.Scene {
     for (let i = 0; i < CAR_SKINS.length; i++) {
       const skin     = CAR_SKINS[i];
       const unlocked = this.unlockedSkins.includes(skin.id);
-      const selected = this.selectedSkinIdx === i;
+      const selected = this.unlockedSkins[this.selectedSkinIdx] === skin.id;
       const spacing  = 140;
       const x = GAME_WIDTH / 2 - (CAR_SKINS.length - 1) * spacing / 2 + i * spacing;
       this.drawSkinCard(this.skinGfxs[i], x, 250, skin.carColor, skin.trailColor, unlocked, selected);
+      this.skinTxts[i].setScale(selected ? 1.05 : 1);
     }
   }
 
@@ -242,11 +265,14 @@ export class MenuScene extends Phaser.Scene {
 
     this.hsTxt = [];
     if (scores.length === 0) {
-      this.add.text(ox, oy + 24, 'No scores yet. Start racing!', {
+      const empty = this.add.text(ox, oy + 24, 'NO LEGENDS YET — BE THE FIRST!', {
         fontFamily: 'Rajdhani, monospace',
-        fontSize: '16px',
-        color: '#334466',
+        fontSize: '18px',
+        color: '#ff00cc',
+        stroke: '#000000',
+        strokeThickness: 2,
       }).setOrigin(0.5, 0).setDepth(6);
+      this.tweens.add({ targets: empty, alpha: 0.45, duration: 650, yoyo: true, repeat: -1 });
     } else {
       scores.slice(0, 5).forEach((entry, idx) => {
         const medalColors = ['#ffdd00', '#cccccc', '#cc7733', '#888899', '#667788'];
@@ -260,27 +286,43 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildStartPrompt(): void {
-    this.startTxt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 65, 'PRESS ENTER OR SPACE TO START', {
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT - 72;
+    this.startButtonGfx = this.add.graphics().setDepth(7);
+    this.startButtonGfx.fillStyle(COLORS.NEON_CYAN, 0.14);
+    this.startButtonGfx.fillRoundedRect(cx - 190, cy - 25, 380, 50, 8);
+    this.startButtonGfx.lineStyle(2, COLORS.NEON_CYAN, 0.9);
+    this.startButtonGfx.strokeRoundedRect(cx - 190, cy - 25, 380, 50, 8);
+
+    this.startTxt = this.add.text(cx, cy, 'START RACE', {
       fontFamily: 'Orbitron, monospace',
-      fontSize: '18px',
+      fontSize: '23px',
       color: '#00ffff',
       stroke: '#000000',
       strokeThickness: 3,
-    }).setOrigin(0.5, 0.5).setDepth(8);
+    }).setOrigin(0.5, 0.5).setDepth(8).setInteractive({ useHandCursor: true });
+    this.startTxt.on('pointerdown', () => this.startGame());
+    this.startTxt.on('pointerover', () => this.startTxt.setColor('#ffffff'));
+    this.startTxt.on('pointerout', () => this.startTxt.setColor('#00ffff'));
 
     this.tweens.add({
       targets:  this.startTxt,
-      alpha:    0.1,
+      scaleX:   1.06,
+      scaleY:   1.06,
       duration: 700,
       yoyo:     true,
       repeat:   -1,
       ease:     'Sine.easeInOut',
     });
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 38, '◄ ► Navigate skins', {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 35, 'ARROWS / WASD — DRIVE   •   SPACE / SHIFT — DRIFT   •   E — BOOST', {
       fontFamily: 'Rajdhani, monospace',
-      fontSize: '14px',
-      color: '#445566',
+      fontSize: '13px',
+      color: '#6688aa',
+    }).setOrigin(0.5, 0.5).setDepth(8);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 14, '◄ ► OR CLICK A CAR TO SELECT', {
+      fontFamily: 'Rajdhani, monospace', fontSize: '12px', color: '#445566',
     }).setOrigin(0.5, 0.5).setDepth(8);
   }
 
@@ -291,6 +333,14 @@ export class MenuScene extends Phaser.Scene {
     if (this.titleTxt) {
       const s = 1 + Math.sin(this.timer * 1.5) * 0.015;
       this.titleTxt.setScale(s, s);
+    }
+
+    // Make the selected ride read as a live preview rather than a subtle border.
+    const selectedId = this.unlockedSkins[this.selectedSkinIdx];
+    for (let i = 0; i < CAR_SKINS.length; i++) {
+      const selected = CAR_SKINS[i].id === selectedId;
+      const pulse = selected ? 1.06 + Math.sin(this.timer * 5) * 0.055 : 1;
+      this.skinTxts[i]?.setScale(selected ? pulse * 1.03 : 1);
     }
 
     // Skin navigation

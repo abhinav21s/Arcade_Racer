@@ -127,19 +127,19 @@ export class PlayerCar {
 
     const cx = GAME_WIDTH  / 2;
     const cy = GAME_HEIGHT / 2;
-    const lineCount = 18;
-    const alpha = intensity * 0.45;
+    const lineCount = 18 + Math.floor(intensity * 20);
+    const alpha = intensity * 0.66;
 
     for (let i = 0; i < lineCount; i++) {
       const angle = (i / lineCount) * Math.PI * 2 + this.flickerTimer * 0.3;
       const startR = 40 + (Math.sin(this.flickerTimer * 2 + i) * 0.5 + 0.5) * 80;
-      const endR = startR + 100 + intensity * 180;
+      const endR = startR + 130 + intensity * 250;
       const x1 = cx + Math.cos(angle) * startR;
       const y1 = cy + Math.sin(angle) * startR;
       const x2 = cx + Math.cos(angle) * endR;
       const y2 = cy + Math.sin(angle) * endR;
       const lineColor = i % 3 === 0 ? COLORS.NEON_CYAN : (i % 3 === 1 ? COLORS.NEON_MAGENTA : 0x6633ff);
-      g.lineStyle(1, lineColor, alpha);
+      g.lineStyle(1 + intensity * 1.5, lineColor, alpha);
       g.lineBetween(x1, y1, x2, y2);
     }
   }

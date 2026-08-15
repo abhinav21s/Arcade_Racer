@@ -108,7 +108,7 @@ export class ParticleManager {
   }
 
   spawnCrashDebris(cx: number, cy: number): void {
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 64; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 80 + Math.random() * 200;
       const colors = [COLORS.NEON_MAGENTA, COLORS.NEON_CYAN, COLORS.NEON_ORANGE, 0xffffff];
@@ -124,12 +124,12 @@ export class ParticleManager {
     }
     // Trigger red flash
     this.flashColor = 0xff0000;
-    this.flashAlpha = 0.6;
+    this.flashAlpha = 0.82;
   }
 
   spawnNearMissFlash(): void {
     this.vignetteColor = COLORS.NEON_CYAN;
-    this.vignetteAlpha = 0.5;
+    this.vignetteAlpha = 0.72;
   }
 
   spawnPowerUpCollect(cx: number, cy: number, color: number): void {
@@ -171,8 +171,8 @@ export class ParticleManager {
     // Continuous drift sparks
     if (player.isDrifting && player.speed > 60) {
       const dir = player.lateralPos > 0 ? -1 : 1;
-      if (Math.random() < 0.6) {
-        this.spawnDriftSparks(carX, carY + 12, dir, 3);
+      if (Math.random() < 0.85) {
+        this.spawnDriftSparks(carX, carY + 12, dir, 5);
       }
     }
 

@@ -57,7 +57,10 @@ export class PlayerCar {
     const skin = CAR_SKINS[this.player.skinIndex] ?? CAR_SKINS[0];
     // Use the same projected road point for X and Y, anchoring the tires to tar.
     const carX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 5);
-    const carY = roadRenderer.getPlayerScreenY(5) - CAR_H * 0.32;
+    const targetCarY = roadRenderer.getPlayerScreenY(5) - CAR_H * 0.32;
+    // The road projection changes segment-by-segment. Smooth its vertical result
+    // so hills feel like suspension travel rather than a hopping sprite.
+    const carY = lerp(this.lastY, targetCarY, Math.min(dt * 3.2, 0.08));
 
     // ---- Trail ----
     this.updateTrail(dt, carX, carY, skin.trailColor);

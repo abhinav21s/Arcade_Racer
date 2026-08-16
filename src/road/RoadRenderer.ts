@@ -358,14 +358,14 @@ export class RoadRenderer {
         }
       }
 
-      // Solid double-magenta centre lane, a neon equivalent of a centre divider.
+      // Solid double-yellow centre lane, kept distinct from every player skin.
       const centerOffsetNear = Math.max(2, Math.min(24, near.w * 0.025));
       const centerOffsetFar = Math.max(1, Math.min(8, far.w * 0.025));
       const centerWidth = Math.max(1, Math.min(6, near.w * 0.007));
       for (const side of [-1, 1]) {
-        g.lineStyle(centerWidth * 3, COLORS.NEON_MAGENTA, 0.25);
+        g.lineStyle(centerWidth * 3, COLORS.NEON_YELLOW, 0.28);
         g.lineBetween(near.x + side * centerOffsetNear, ny, far.x + side * centerOffsetFar, fy);
-        g.lineStyle(centerWidth, 0xff66dd, 0.95);
+        g.lineStyle(centerWidth, 0xfff4a3, 1);
         g.lineBetween(near.x + side * centerOffsetNear, ny, far.x + side * centerOffsetFar, fy);
       }
     }

@@ -30,6 +30,7 @@ const HORIZON_Y = H * 0.42;   // Horizon sits here (sky/road split)
 export class RoadRenderer {
   private scene:        Phaser.Scene;
   private gfx:          Phaser.GameObjects.Graphics; // main road draw
+  private roadDetailGfx:Phaser.GameObjects.Graphics; // crisp lanes and guardrails above tar
   private skyGfx:       Phaser.GameObjects.Graphics; // sky background
   private spriteLayer:  Phaser.GameObjects.Container;
   private cityLayer:    Phaser.GameObjects.Graphics; // neon city silhouette
@@ -52,6 +53,7 @@ export class RoadRenderer {
 
     // Main road graphics (redrawn every frame)
     this.gfx = scene.add.graphics();
+    this.roadDetailGfx = scene.add.graphics().setDepth(2);
 
     // Sprite layer for roadside props (on top of road)
     this.spriteLayer = scene.add.container(0, 0);
@@ -299,6 +301,9 @@ export class RoadRenderer {
       maxScreenY = clampedTop;
     }
 
+    // ---- Crisp overlay: deliberately separate so road markings never get lost ----
+    this.drawNeonHighwayDetails(cameraSegIdx);
+
     // ---- Draw roadside sprites ----
     this.drawRoadsideSprites(generator, cameraSegIdx, segOffset);
 
@@ -306,6 +311,63 @@ export class RoadRenderer {
     g.fillStyle(COLORS.GRASS_A, 1);
     if (maxScreenY < H) {
       // Already covered by road rendering
+    }
+  }
+
+  /**
+   * Draw a strong arcade-highway language above the road fill: solid neon rails,
+   * cyan/white dashed lane dividers, and a magenta centre guide. The painter's
+   * road segments remain responsible for hills and curves; this layer guarantees
+   * the markings are readable at any speed.
+   */
+  private drawNeonHighwayDetails(cameraSegIdx: number): void {
+    const g = this.roadDetailGfx;
+    g.clear();
+
+    for (let i = DRAW_LENGTH - 2; i >= 0; i--) {
+      const near = this.projPoints[i];
+      const far = this.projPoints[i + 1];
+      if (!near || !far) continue;
+      if (near.y < HORIZON_Y || far.y > H + 40 || near.y <= far.y) continue;
+
+      const ny = Math.min(near.y, H + 30);
+      const fy = Math.max(far.y, HORIZON_Y);
+      const dash = Math.floor((cameraSegIdx + i) / 3) % 2 === 0;
+
+      // Continuous, dual-colour safety rails at the outside of the road.
+      const railWidth = Math.max(1, Math.min(8, near.w * 0.010));
+      for (const side of [-1, 1]) {
+        const nx = near.x + side * near.w * 0.98;
+        const fx = far.x + side * far.w * 0.98;
+        g.lineStyle(railWidth * 3, side < 0 ? COLORS.NEON_MAGENTA : COLORS.NEON_CYAN, 0.28);
+        g.lineBetween(nx, ny, fx, fy);
+        g.lineStyle(railWidth, 0xffffff, 0.9);
+        g.lineBetween(nx, ny, fx, fy);
+      }
+
+      // Cyan-white dashed lane dividers. Four lanes means dividers at -0.5/+0.5.
+      if (dash) {
+        for (const lane of [-0.5, 0.5]) {
+          const nx = near.x + lane * near.w;
+          const fx = far.x + lane * far.w;
+          const width = Math.max(1, Math.min(7, near.w * 0.009));
+          g.lineStyle(width * 2.4, COLORS.NEON_CYAN, 0.25);
+          g.lineBetween(nx, ny, fx, fy);
+          g.lineStyle(width, 0xf7fbff, 0.96);
+          g.lineBetween(nx, ny, fx, fy);
+        }
+      }
+
+      // Solid double-magenta centre lane, a neon equivalent of a centre divider.
+      const centerOffsetNear = Math.max(2, Math.min(24, near.w * 0.025));
+      const centerOffsetFar = Math.max(1, Math.min(8, far.w * 0.025));
+      const centerWidth = Math.max(1, Math.min(6, near.w * 0.007));
+      for (const side of [-1, 1]) {
+        g.lineStyle(centerWidth * 3, COLORS.NEON_MAGENTA, 0.25);
+        g.lineBetween(near.x + side * centerOffsetNear, ny, far.x + side * centerOffsetFar, fy);
+        g.lineStyle(centerWidth, 0xff66dd, 0.95);
+        g.lineBetween(near.x + side * centerOffsetNear, ny, far.x + side * centerOffsetFar, fy);
+      }
     }
   }
 
@@ -450,6 +512,7 @@ export class RoadRenderer {
 
   destroy(): void {
     this.gfx.destroy();
+    this.roadDetailGfx.destroy();
     this.skyGfx.destroy();
     this.cityLayer.destroy();
     this.spriteLayer.destroy();

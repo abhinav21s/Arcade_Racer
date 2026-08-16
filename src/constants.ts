@@ -23,8 +23,8 @@ export const COLORS = {
   // Road alternating stripes
   GRASS_A:        0x06130f,
   GRASS_B:        0x091814,
-  ROAD_A:         0x12141b,   // black asphalt
-  ROAD_B:         0x0b0d13,   // alternating tar shade
+  ROAD_A:         0x1a092b,   // black tar with a violet neon cast
+  ROAD_B:         0x11061e,   // alternating asphalt shade
   RUMBLE_A:       0xff00cc,   // magenta
   RUMBLE_B:       0x00ccff,   // cyan
   LANE_MARK:      0x442266,   // dim purple dash

@@ -8,18 +8,17 @@ import { CAR_SKINS, COLORS, GAME_WIDTH, GAME_HEIGHT } from '../constants';
 import { lerp } from '../utils/Math';
 import { PowerUpType } from '../powerups/PowerUpTypes';
 
-const PLAYER_Y = GAME_HEIGHT * 0.76;  // Fallback before the road has rendered
-const CAR_W = 78;
-const CAR_H = 42;
+const CAR_W = 84;
+const CAR_H = 46;
 
 export class PlayerCar {
   private scene:   Phaser.Scene;
   private player:  Player;
   private gfx:     Phaser.GameObjects.Graphics;   // Car body
   private trailGfx:Phaser.GameObjects.Graphics;   // Neon trail
-  private glowGfx: Phaser.GameObjects.Graphics;   // Glow layer (below car)
+  private glowGfx: Phaser.GameObjects.Graphics;   // Shadow & ground contact glow
   private trailPoints: Array<{ x: number; y: number; age: number }> = [];
-  private maxTrailPoints = 30;
+  private maxTrailPoints = 35;
 
   // Shield visual
   private shieldGfx: Phaser.GameObjects.Graphics;
@@ -33,14 +32,16 @@ export class PlayerCar {
   private speedLineGfx: Phaser.GameObjects.Graphics;
 
   private lastX = GAME_WIDTH / 2;
-  private lastY = PLAYER_Y;
+  private lastY = GAME_HEIGHT * 0.78;
   private flickerTimer = 0;
+  private wheelSpin = 0;
+  private roadRumbleTimer = 0;
 
   constructor(scene: Phaser.Scene, player: Player) {
     this.scene  = scene;
     this.player = player;
 
-    // Rendering order (depth): trail → glow → car → shield → chromatic
+    // Rendering order (depth): trail → glow/shadow → car → shield → chromatic
     this.trailGfx    = scene.add.graphics().setDepth(10);
     this.speedLineGfx= scene.add.graphics().setDepth(11);
     this.glowGfx     = scene.add.graphics().setDepth(12);
@@ -55,12 +56,25 @@ export class PlayerCar {
     getPlayerScreenY: (d: number) => number;
   }): void {
     const skin = CAR_SKINS[this.player.skinIndex] ?? CAR_SKINS[0];
-    // Use the same projected road point for X and Y, anchoring the tires to tar.
-    const carX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 5);
-    const targetCarY = roadRenderer.getPlayerScreenY(5) - CAR_H * 0.32;
-    // The road projection changes segment-by-segment. Smooth its vertical result
-    // so hills feel like suspension travel rather than a hopping sprite.
-    const carY = lerp(this.lastY, targetCarY, Math.min(dt * 3.2, 0.08));
+    const speedFrac = this.player.speedFraction;
+
+    // Projected road position (depth index 3 places the car grounded in player's forward view)
+    const rawRoadX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 3);
+    const rawRoadY = roadRenderer.getPlayerScreenY(3);
+
+    // Smooth horizontal tracking with slight tire lag
+    const carX = lerp(this.lastX, rawRoadX, Math.min(dt * 24, 1.0));
+
+    // Road suspension vibration: high frequency asphalt rumble that makes the car feel in direct contact with the road
+    this.roadRumbleTimer += dt * (15 + speedFrac * 35);
+    const asphaltRumble = (Math.sin(this.roadRumbleTimer * 2.8) * 0.8 + Math.cos(this.roadRumbleTimer * 4.2) * 0.4) * speedFrac;
+    
+    // Pitch squat on acceleration / dive on braking
+    const pitchOffset = (this.player.isBoostActive ? 2.5 : speedFrac * 1.5);
+    const targetCarY = Math.min(rawRoadY - CAR_H * 0.35 + asphaltRumble + pitchOffset, GAME_HEIGHT - 60);
+    const carY = lerp(this.lastY, targetCarY, Math.min(dt * 12, 1.0));
+
+    this.wheelSpin += dt * (10 + speedFrac * 40);
 
     // ---- Trail ----
     this.updateTrail(dt, carX, carY, skin.trailColor);
@@ -68,8 +82,8 @@ export class PlayerCar {
     // ---- Speed lines ----
     this.drawSpeedLines(dt);
 
-    // ---- Glow under car ----
-    this.drawGlow(carX, carY, skin.carColor);
+    // ---- Shadow & ground contact glow (pins car firmly to asphalt) ----
+    this.drawGlowAndShadow(carX, carY, skin.carColor, speedFrac);
 
     // ---- Car body ----
     this.drawCar(carX, carY, skin.carColor);
@@ -90,37 +104,37 @@ export class PlayerCar {
     const isDrifting = this.player.isDrifting;
     const isBoost = this.player.isBoostActive;
 
-    // Add new trail point
-    if (this.player.speed > 30) {
-      this.trailPoints.unshift({ x, y: y + 8, age: 0 });
+    // Add new trail point from rear tires
+    if (this.player.speed > 20) {
+      this.trailPoints.unshift({ x, y: y + CAR_H * 0.35, age: 0 });
     }
 
     // Age and cull
     for (const p of this.trailPoints) p.age += dt;
-    const maxAge = isDrifting ? 0.6 : isBoost ? 0.4 : 0.25;
+    const maxAge = isDrifting ? 0.85 : isBoost ? 0.45 : 0.28;
     this.trailPoints = this.trailPoints.filter(p => p.age < maxAge).slice(0, this.maxTrailPoints);
 
     g.clear();
     if (this.trailPoints.length < 2) return;
 
-    // Draw trail segments with fading alpha
     for (let i = 0; i < this.trailPoints.length - 1; i++) {
       const p0 = this.trailPoints[i];
       const p1 = this.trailPoints[i + 1];
       const t = 1 - (p0.age / maxAge);
-      const alpha = t * (isDrifting ? 0.9 : 0.55);
-      const width = lerp(isDrifting ? 12 : 6, 1, p0.age / maxAge);
+      const alpha = t * (isDrifting ? 1.0 : isBoost ? 0.75 : 0.55);
+      const width = lerp(isDrifting ? 20 : isBoost ? 10 : 6, 1, p0.age / maxAge);
 
       const color = isDrifting
         ? (i % 2 === 0 ? COLORS.NEON_MAGENTA : COLORS.NEON_CYAN)
+        : isBoost ? COLORS.NEON_YELLOW
         : trailColor;
 
       g.lineStyle(width, color, alpha);
       g.lineBetween(p0.x, p0.y, p1.x, p1.y);
 
-      // Inner bright core
-      if (alpha > 0.3) {
-        g.lineStyle(Math.max(1, width * 0.3), 0xffffff, alpha * 0.5);
+      if (alpha > 0.25) {
+        const coreW = isDrifting ? Math.max(2, width * 0.4) : Math.max(1, width * 0.3);
+        g.lineStyle(coreW, 0xffffff, alpha * (isDrifting ? 0.75 : 0.5));
         g.lineBetween(p0.x, p0.y, p1.x, p1.y);
       }
     }
@@ -131,40 +145,69 @@ export class PlayerCar {
     g.clear();
 
     const speed = this.player.speedFraction;
-    const intensity = Math.max(0, (speed - 0.55) / 0.45);
+    const intensity = Math.max(0, (speed - 0.45) / 0.55);
     if (intensity < 0.01) return;
 
     const cx = GAME_WIDTH  / 2;
     const cy = GAME_HEIGHT / 2;
-    const lineCount = 18 + Math.floor(intensity * 20);
-    const alpha = intensity * 0.66;
+    const lineCount = 22 + Math.floor(intensity * 26);
+    const alpha = intensity * 0.75;
 
     for (let i = 0; i < lineCount; i++) {
-      const angle = (i / lineCount) * Math.PI * 2 + this.flickerTimer * 0.3;
-      const startR = 40 + (Math.sin(this.flickerTimer * 2 + i) * 0.5 + 0.5) * 80;
-      const endR = startR + 130 + intensity * 250;
+      const angle = (i / lineCount) * Math.PI * 2 + this.flickerTimer * 0.4;
+      const startR = 30 + (Math.sin(this.flickerTimer * 2.5 + i * 0.7) * 0.5 + 0.5) * 60;
+      const endR   = startR + 160 + intensity * 320;
       const x1 = cx + Math.cos(angle) * startR;
       const y1 = cy + Math.sin(angle) * startR;
       const x2 = cx + Math.cos(angle) * endR;
       const y2 = cy + Math.sin(angle) * endR;
-      const lineColor = i % 3 === 0 ? COLORS.NEON_CYAN : (i % 3 === 1 ? COLORS.NEON_MAGENTA : 0x6633ff);
-      g.lineStyle(1 + intensity * 1.5, lineColor, alpha);
+      const lineColor = i % 4 === 0 ? COLORS.NEON_MAGENTA
+        : i % 4 === 1 ? 0x6633ff
+        : COLORS.NEON_CYAN;
+      g.lineStyle(0.8 + intensity * 2, lineColor, alpha * (0.6 + 0.4 * Math.random()));
       g.lineBetween(x1, y1, x2, y2);
     }
   }
 
-  private drawGlow(cx: number, cy: number, color: number): void {
+  private drawGlowAndShadow(cx: number, cy: number, color: number, speedFrac: number): void {
     const g = this.glowGfx;
     g.clear();
     const boost = this.player.isBoostActive;
-    const radius = boost ? 55 : 35;
-    const alpha  = boost ? 0.35 : 0.18;
+    const w = CAR_W;
+    const h = CAR_H;
+    const lean = this.player.driftAngle;
+    const leanOffset = lean * w * 1.1;
 
-    // Outer glow blob
-    g.fillStyle(color, alpha * 0.4);
-    g.fillEllipse(cx, cy + 10, radius * 2.5, radius * 0.7);
-    g.fillStyle(color, alpha);
-    g.fillEllipse(cx, cy + 10, radius * 1.5, radius * 0.45);
+    // 1. Heavy asphalt contact shadow (black ambient occlusion firmly grounding the car to road)
+    g.fillStyle(0x000000, 0.85);
+    g.fillEllipse(cx + leanOffset * 0.2, cy + h * 0.46, w * 1.15, h * 0.35);
+
+    // 2. Direct tire contact patches on the asphalt
+    g.fillStyle(0x000000, 0.95);
+    g.fillEllipse(cx - w * 0.44 + leanOffset, cy + h * 0.48, w * 0.22, 9);
+    g.fillEllipse(cx + w * 0.44 + leanOffset, cy + h * 0.48, w * 0.22, 9);
+    g.fillEllipse(cx - w * 0.38 + leanOffset, cy + h * 0.08, w * 0.18, 7);
+    g.fillEllipse(cx + w * 0.38 + leanOffset, cy + h * 0.08, w * 0.18, 7);
+
+    // 3. Neon ground underglow reflecting off wet tarmac
+    const radius = boost ? 60 : 40;
+    const alpha  = boost ? 0.45 : 0.25;
+    g.fillStyle(color, alpha * 0.3);
+    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.38, radius * 2.6, radius * 0.65);
+    g.fillStyle(color, alpha * 0.7);
+    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.40, radius * 1.6, radius * 0.4);
+
+    // 4. Road tire kick-up sparks at high speed or during drift
+    if (speedFrac > 0.4 || this.player.isDrifting) {
+      const sparkCount = this.player.isDrifting ? 6 : 2;
+      for (let s = 0; s < sparkCount; s++) {
+        const side = s % 2 === 0 ? -1 : 1;
+        const sx = cx + side * (w * 0.44) + leanOffset + (Math.random() - 0.5) * 8;
+        const sy = cy + h * 0.48 + Math.random() * 6;
+        g.fillStyle(this.player.isDrifting ? COLORS.NEON_YELLOW : color, 0.8);
+        g.fillCircle(sx, sy, 1.5 + Math.random() * 1.5);
+      }
+    }
   }
 
   private drawCar(cx: number, cy: number, color: number): void {
@@ -173,118 +216,157 @@ export class PlayerCar {
 
     const lean = this.player.driftAngle;
     const boost = this.player.isBoostActive;
-    const invincible = this.player.invincible && Math.floor(this.flickerTimer * 12) % 2 === 0;
+    const invincible = this.player.invincible && Math.floor(this.flickerTimer * 14) % 2 === 0;
 
     if (invincible) {
-      // Flicker when invincible
-      g.setAlpha(0.4);
+      g.setAlpha(0.35);
     } else {
       g.setAlpha(1);
     }
 
-    // Lean transformation via translation
-    const leanOffset = lean * CAR_W * 1.2;
-
+    const leanOffset = lean * CAR_W * 1.1;
     const w = CAR_W;
     const h = CAR_H;
 
-    // ---- Car body (stylized top-down view) ----
-    // Shadow
-    g.fillStyle(0x000000, 0.5);
-    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.6, w * 1.2, h * 0.4);
+    // ---- 1. Wide Rubber Tires with Neon Rims (Contacting Road) ----
+    const tireColor = 0x0a0a14;
+    const rimColor = color;
+    
+    // Rear Tires (Low and wide, resting directly on the road plane)
+    g.fillStyle(tireColor, 1);
+    g.fillRoundedRect(cx - w * 0.54 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
+    g.fillRoundedRect(cx + w * 0.35 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
+    // Tire tread pattern & neon rim rings
+    g.lineStyle(1.5, rimColor, 0.9);
+    g.strokeRoundedRect(cx - w * 0.54 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
+    g.strokeRoundedRect(cx + w * 0.35 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
+    // Rotating wheel spokes
+    const spokeOffset = Math.sin(this.wheelSpin) * 4;
+    g.lineStyle(1, 0xffffff, 0.7);
+    g.lineBetween(cx - w * 0.44 + leanOffset - 4, cy + h * 0.31 + spokeOffset, cx - w * 0.44 + leanOffset + 4, cy + h * 0.31 - spokeOffset);
+    g.lineBetween(cx + w * 0.44 + leanOffset - 4, cy + h * 0.31 + spokeOffset, cx + w * 0.44 + leanOffset + 4, cy + h * 0.31 - spokeOffset);
 
-    // Main body
+    // Front Tires
+    g.fillStyle(tireColor, 1);
+    g.fillRoundedRect(cx - w * 0.46 + leanOffset, cy - h * 0.36, w * 0.14, h * 0.32, 3);
+    g.fillRoundedRect(cx + w * 0.32 + leanOffset, cy - h * 0.36, w * 0.14, h * 0.32, 3);
+    g.lineStyle(1, rimColor, 0.7);
+    g.strokeRoundedRect(cx - w * 0.46 + leanOffset, cy - h * 0.36, w * 0.14, h * 0.32, 3);
+    g.strokeRoundedRect(cx + w * 0.32 + leanOffset, cy - h * 0.36, w * 0.14, h * 0.32, 3);
+
+    // ---- 2. Main Aerodynamic Chassis ----
+    g.fillStyle(0x0e0e1a, 1);
+    const underTray = [
+      { x: cx - w * 0.46 + leanOffset, y: cy - h * 0.3 },
+      { x: cx + w * 0.46 + leanOffset, y: cy - h * 0.3 },
+      { x: cx + w * 0.44 + leanOffset, y: cy + h * 0.42 },
+      { x: cx - w * 0.44 + leanOffset, y: cy + h * 0.42 },
+    ];
+    g.fillPoints(underTray, true);
+
+    // Body Paint Layer
     g.fillStyle(color, 1);
     const bodyPts = [
-      { x: cx - w * 0.45 + leanOffset, y: cy - h * 0.1 },
-      { x: cx + w * 0.45 + leanOffset, y: cy - h * 0.1 },
-      { x: cx + w * 0.38 + leanOffset, y: cy + h * 0.45 },
-      { x: cx - w * 0.38 + leanOffset, y: cy + h * 0.45 },
+      { x: cx - w * 0.42 + leanOffset, y: cy - h * 0.12 },
+      { x: cx + w * 0.42 + leanOffset, y: cy - h * 0.12 },
+      { x: cx + w * 0.38 + leanOffset, y: cy + h * 0.42 },
+      { x: cx - w * 0.38 + leanOffset, y: cy + h * 0.42 },
     ];
     g.fillPoints(bodyPts, true);
-    g.lineStyle(2, 0xffffff, 0.32);
+    g.lineStyle(2, 0xffffff, 0.45);
     g.strokePoints(bodyPts, true);
 
-    // Wide wheel arches and tires make the player read as a low-slung racer.
-    g.fillStyle(0x05050d, 1);
-    g.fillRoundedRect(cx - w * 0.53 + leanOffset, cy - h * 0.03, w * 0.16, h * 0.42, 3);
-    g.fillRoundedRect(cx + w * 0.37 + leanOffset, cy - h * 0.03, w * 0.16, h * 0.42, 3);
-    g.fillStyle(COLORS.NEON_CYAN, 0.45);
-    g.fillRect(cx - w * 0.49 + leanOffset, cy + h * 0.08, w * 0.05, h * 0.2);
-    g.fillRect(cx + w * 0.44 + leanOffset, cy + h * 0.08, w * 0.05, h * 0.2);
-
-    // Hood (front, slimmer)
-    g.fillStyle(color, 0.8);
+    // Hood / Front Nose (Tapers forward)
+    g.fillStyle(color, 0.9);
     const hoodPts = [
-      { x: cx - w * 0.3 + leanOffset, y: cy - h * 0.1 },
-      { x: cx + w * 0.3 + leanOffset, y: cy - h * 0.1 },
-      { x: cx + w * 0.22 + leanOffset, y: cy - h * 0.5 },
-      { x: cx - w * 0.22 + leanOffset, y: cy - h * 0.5 },
+      { x: cx - w * 0.32 + leanOffset, y: cy - h * 0.12 },
+      { x: cx + w * 0.32 + leanOffset, y: cy - h * 0.12 },
+      { x: cx + w * 0.24 + leanOffset, y: cy - h * 0.48 },
+      { x: cx - w * 0.24 + leanOffset, y: cy - h * 0.48 },
     ];
     g.fillPoints(hoodPts, true);
+    g.lineStyle(1.5, 0xffffff, 0.6);
+    g.strokePoints(hoodPts, true);
 
-    // Windshield (dark)
-    g.fillStyle(0x001122, 0.85);
+    // Windshield & Canopy (Dark polarized glass with neon cyber frame)
+    g.fillStyle(0x020a14, 0.92);
     const windPts = [
-      { x: cx - w * 0.24 + leanOffset, y: cy - h * 0.12 },
-      { x: cx + w * 0.24 + leanOffset, y: cy - h * 0.12 },
-      { x: cx + w * 0.18 + leanOffset, y: cy - h * 0.42 },
-      { x: cx - w * 0.18 + leanOffset, y: cy - h * 0.42 },
+      { x: cx - w * 0.25 + leanOffset, y: cy - h * 0.10 },
+      { x: cx + w * 0.25 + leanOffset, y: cy - h * 0.10 },
+      { x: cx + w * 0.18 + leanOffset, y: cy - h * 0.40 },
+      { x: cx - w * 0.18 + leanOffset, y: cy - h * 0.40 },
     ];
     g.fillPoints(windPts, true);
-
-    // Canopy frame, hood stripe, and rear spoiler add readable supercar detail.
-    g.lineStyle(2, COLORS.NEON_CYAN, 0.75);
+    g.lineStyle(2, COLORS.NEON_CYAN, 0.85);
     g.strokePoints(windPts, true);
-    g.fillStyle(0xffffff, 0.28);
-    g.fillRect(cx - w * 0.035 + leanOffset, cy - h * 0.08, w * 0.07, h * 0.48);
-    g.fillStyle(0x070714, 1);
-    g.fillRoundedRect(cx - w * 0.47 + leanOffset, cy + h * 0.36, w * 0.94, h * 0.10, 2);
-    g.lineStyle(2, color, 0.95);
-    g.lineBetween(cx - w * 0.48 + leanOffset, cy + h * 0.34, cx + w * 0.48 + leanOffset, cy + h * 0.34);
 
-    // Headlights (neon glow)
+    // Center Racing Stripe
+    g.fillStyle(0xffffff, 0.35);
+    g.fillRect(cx - w * 0.04 + leanOffset, cy - h * 0.46, w * 0.08, h * 0.84);
+
+    // ---- 3. GT Wing Spoiler & Rear Aerodynamics ----
+    g.fillStyle(0x050510, 1);
+    g.fillRoundedRect(cx - w * 0.46 + leanOffset, cy + h * 0.34, w * 0.92, h * 0.10, 2);
+    g.lineStyle(2.5, color, 1.0);
+    g.lineBetween(cx - w * 0.47 + leanOffset, cy + h * 0.34, cx + w * 0.47 + leanOffset, cy + h * 0.34);
+
+    // ---- 4. Headlights (Bright forward projectors) ----
     const lightColor = boost ? COLORS.NEON_YELLOW : COLORS.NEON_CYAN;
     g.fillStyle(lightColor, 1);
-    g.fillCircle(cx - w * 0.3 + leanOffset, cy - h * 0.45, 5);
-    g.fillCircle(cx + w * 0.3 + leanOffset, cy - h * 0.45, 5);
+    g.fillCircle(cx - w * 0.26 + leanOffset, cy - h * 0.46, 5);
+    g.fillCircle(cx + w * 0.26 + leanOffset, cy - h * 0.46, 5);
     g.fillStyle(lightColor, 0.4);
-    g.fillCircle(cx - w * 0.3 + leanOffset, cy - h * 0.45, 9);
-    g.fillCircle(cx + w * 0.3 + leanOffset, cy - h * 0.45, 9);
+    g.fillCircle(cx - w * 0.26 + leanOffset, cy - h * 0.46, 10);
+    g.fillCircle(cx + w * 0.26 + leanOffset, cy - h * 0.46, 10);
 
-    // Tail lights
+    // Forward light beams onto the road ahead
+    g.fillStyle(lightColor, 0.08);
+    g.fillTriangle(
+      cx - w * 0.26 + leanOffset, cy - h * 0.46,
+      cx - w * 0.60 + leanOffset, cy - h * 1.6,
+      cx - w * 0.05 + leanOffset, cy - h * 1.6,
+    );
+    g.fillTriangle(
+      cx + w * 0.26 + leanOffset, cy - h * 0.46,
+      cx + w * 0.05 + leanOffset, cy - h * 1.6,
+      cx + w * 0.60 + leanOffset, cy - h * 1.6,
+    );
+
+    // ---- 5. Glowing Neon LED Taillight Bar ----
     const tailColor = COLORS.NEON_MAGENTA;
     g.fillStyle(tailColor, 1);
-    g.fillRect(cx - w * 0.4 + leanOffset, cy + h * 0.35, 10, 5);
-    g.fillRect(cx + w * 0.28 + leanOffset, cy + h * 0.35, 10, 5);
+    g.fillRect(cx - w * 0.40 + leanOffset, cy + h * 0.38, w * 0.80, 5);
+    g.fillStyle(0xffffff, 0.8);
+    g.fillRect(cx - w * 0.35 + leanOffset, cy + h * 0.39, w * 0.70, 2);
 
-    // Rear diffuser and exhaust ports.
-    g.fillStyle(0x05050d, 1);
-    g.fillRect(cx - w * 0.24 + leanOffset, cy + h * 0.39, w * 0.48, h * 0.11);
-    g.fillStyle(COLORS.NEON_ORANGE, boost ? 1 : 0.55);
-    g.fillCircle(cx - w * 0.12 + leanOffset, cy + h * 0.45, 3);
-    g.fillCircle(cx + w * 0.12 + leanOffset, cy + h * 0.45, 3);
+    // Dual Rear Exhaust Ports
+    g.fillStyle(0x050510, 1);
+    g.fillRect(cx - w * 0.24 + leanOffset, cy + h * 0.42, w * 0.48, h * 0.08);
+    g.fillStyle(COLORS.NEON_ORANGE, boost ? 1 : 0.6);
+    g.fillCircle(cx - w * 0.12 + leanOffset, cy + h * 0.45, 3.5);
+    g.fillCircle(cx + w * 0.12 + leanOffset, cy + h * 0.45, 3.5);
 
-    // Neon side strips
-    g.lineStyle(2, color, 0.9);
-    g.lineBetween(cx - w * 0.44 + leanOffset, cy, cx - w * 0.38 + leanOffset, cy + h * 0.42);
-    g.lineBetween(cx + w * 0.44 + leanOffset, cy, cx + w * 0.38 + leanOffset, cy + h * 0.42);
-
-    // Boost exhaust flames
+    // Boost Exhaust Thruster Flames
     if (boost) {
       const t = this.flickerTimer;
-      const flameH = 20 + Math.sin(t * 30) * 8;
-      g.fillStyle(COLORS.NEON_YELLOW, 0.9);
+      const flameH = 24 + Math.sin(t * 35) * 10;
+      g.fillStyle(COLORS.NEON_YELLOW, 0.95);
       g.fillTriangle(
-        cx - w * 0.18 + leanOffset, cy + h * 0.45,
-        cx + w * 0.18 + leanOffset, cy + h * 0.45,
-        cx + leanOffset, cy + h * 0.45 + flameH,
+        cx - w * 0.18 + leanOffset, cy + h * 0.46,
+        cx + w * 0.18 + leanOffset, cy + h * 0.46,
+        cx + leanOffset, cy + h * 0.46 + flameH,
       );
-      g.fillStyle(COLORS.NEON_ORANGE, 0.7);
+      g.fillStyle(COLORS.NEON_ORANGE, 0.75);
       g.fillTriangle(
-        cx - w * 0.1 + leanOffset, cy + h * 0.45,
-        cx + w * 0.1 + leanOffset, cy + h * 0.45,
-        cx + leanOffset, cy + h * 0.45 + flameH * 1.3,
+        cx - w * 0.10 + leanOffset, cy + h * 0.46,
+        cx + w * 0.10 + leanOffset, cy + h * 0.46,
+        cx + leanOffset, cy + h * 0.46 + flameH * 1.4,
+      );
+      g.fillStyle(0xffffff, 0.9);
+      g.fillTriangle(
+        cx - w * 0.06 + leanOffset, cy + h * 0.46,
+        cx + w * 0.06 + leanOffset, cy + h * 0.46,
+        cx + leanOffset, cy + h * 0.46 + flameH * 0.5,
       );
     }
 
@@ -297,23 +379,21 @@ export class PlayerCar {
     if (!this.player.shieldActive) return;
 
     this.shieldAngle += dt * 2;
-    const r = 45;
+    const r = 48;
     const pulseR = r + Math.sin(this.flickerTimer * 4) * 5;
 
-    // Rotating arc
-    g.lineStyle(3, COLORS.NEON_CYAN, 0.8);
+    g.lineStyle(3, COLORS.NEON_CYAN, 0.85);
     g.strokeCircle(cx, cy, pulseR);
-    g.lineStyle(1, 0xffffff, 0.4);
+    g.lineStyle(1, 0xffffff, 0.5);
     g.strokeCircle(cx, cy, pulseR + 4);
 
-    // Arc segments
     const segCount = 6;
     for (let i = 0; i < segCount; i++) {
       const a = this.shieldAngle + (i / segCount) * Math.PI * 2;
       const x = cx + Math.cos(a) * (pulseR + 8);
       const y = cy + Math.sin(a) * (pulseR + 8);
       g.fillStyle(COLORS.NEON_CYAN, 0.9);
-      g.fillCircle(x, y, 3);
+      g.fillCircle(x, y, 3.5);
     }
   }
 
@@ -330,14 +410,12 @@ export class PlayerCar {
     const offset = chromIntensity * 5;
     const alpha = chromIntensity * 0.15;
 
-    // Red channel offset left
     this.chromaR.clear();
     this.chromaR.setAlpha(alpha);
     this.chromaR.fillStyle(0xff0000, 0.7);
     this.chromaR.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     this.chromaR.setBlendMode(Phaser.BlendModes.ADD);
 
-    // Blue channel offset right
     this.chromaB.clear();
     this.chromaB.setAlpha(alpha);
     this.chromaB.fillStyle(0x0000ff, 0.7);

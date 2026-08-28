@@ -18,6 +18,7 @@ import {
   SEGMENT_LENGTH, DRAW_LENGTH, GAME_WIDTH, GAME_HEIGHT, COLORS
 } from '../constants';
 import { randFloat, randInt, randItem } from '../utils/Math';
+import { PLAYER_BUMPER_OFFSET_Z } from '../traffic/TrafficManager';
 
 const LANE_POSITIONS = [-0.75, -0.25, 0.25, 0.75]; // 4 lanes
 const MAX_ACTIVE = 5;
@@ -31,10 +32,10 @@ export class PowerUpManager {
   private pool:    PowerUpData[] = [];
   private nextId = 0;
 
-  private spawnTimer = 3;  // Initial delay before first spawn
+  private spawnTimer = 2.5;
   private magnetGfx: Phaser.GameObjects.Graphics;
 
-  // Floating text pool for visual feedback
+  // Floating text pool for instant collection feedback
   private floatTexts: Phaser.GameObjects.Text[] = [];
 
   constructor(scene: Phaser.Scene, emitter: Phaser.Events.EventEmitter) {
@@ -47,11 +48,11 @@ export class PowerUpManager {
     for (let i = 0; i < 6; i++) {
       const t = scene.add.text(0, 0, '', {
         fontFamily: 'Orbitron, monospace',
-        fontSize: '18px',
+        fontSize: '20px',
         color: '#ffffff',
         stroke: '#000000',
-        strokeThickness: 3,
-      }).setDepth(60).setAlpha(0);
+        strokeThickness: 4,
+      }).setDepth(65).setAlpha(0);
       this.floatTexts.push(t);
     }
   }
@@ -61,36 +62,41 @@ export class PowerUpManager {
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
       this.trySpawn(player.cameraZ);
-      this.spawnTimer = POWERUP_SPAWN_INTERVAL * (0.7 + Math.random() * 0.6);
+      this.spawnTimer = POWERUP_SPAWN_INTERVAL * (0.7 + Math.random() * 0.5);
     }
 
     const activePUs = this.pool.filter(p => p.active && !p.collected);
-
-    // Magnet effect: move power-ups toward player
     const hasMagnet = player.activePowerUp?.type === PowerUpType.MAGNET;
+
+    // Player's front bumper depth in world coordinates
+    const playerFrontBumperZ = player.cameraZ + PLAYER_BUMPER_OFFSET_Z;
+
+    // Magnet effect: pull power-ups toward player
     if (hasMagnet) {
       for (const pu of activePUs) {
-        const relZ = pu.worldZ - player.cameraZ;
-        if (relZ > 0 && relZ < SEGMENT_LENGTH * 60) {
-          // Pull lateral position toward player
-          pu.lanePos += (player.lateralPos - pu.lanePos) * dt * 1.2;
+        const relZ = pu.worldZ - playerFrontBumperZ;
+        if (relZ > 0 && relZ < SEGMENT_LENGTH * 40) {
+          pu.lanePos += (player.lateralPos - pu.lanePos) * dt * 2.5;
         }
       }
     }
 
-    // Collect check
+    // Precise front-bumper collection check
     for (const pu of activePUs) {
-      const relZ = pu.worldZ - player.cameraZ;
-      if (Math.abs(relZ) > SEGMENT_LENGTH * 4) continue;
+      const relFrontZ = pu.worldZ - playerFrontBumperZ;
 
-      const latDist = Math.abs(player.lateralPos - pu.lanePos);
-      const collectR = hasMagnet ? POWERUP_COLLECT_RADIUS * 2.5 : POWERUP_COLLECT_RADIUS;
-      if (latDist < collectR) {
-        this.collect(pu, player, score);
+      // In collect depth window (when power-up touches the front hood)
+      if (Math.abs(relFrontZ) <= SEGMENT_LENGTH * 0.85) {
+        const latDist = Math.abs(player.lateralPos - pu.lanePos);
+        const collectR = hasMagnet ? POWERUP_COLLECT_RADIUS * 2.8 : POWERUP_COLLECT_RADIUS * 1.35;
+        if (latDist < collectR) {
+          this.collect(pu, player, score);
+          continue;
+        }
       }
 
-      // Recycle if behind camera
-      if (relZ < -SEGMENT_LENGTH * 10) {
+      // Recycle if passed behind camera
+      if (pu.worldZ < player.cameraZ - SEGMENT_LENGTH * 4) {
         pu.active = false;
       }
     }
@@ -98,8 +104,8 @@ export class PowerUpManager {
     // Update floating text animations
     for (const t of this.floatTexts) {
       if (t.alpha > 0) {
-        t.y -= dt * 80;
-        t.alpha -= dt * 1.2;
+        t.y -= dt * 75;
+        t.alpha -= dt * 1.3;
       }
     }
   }
@@ -112,7 +118,6 @@ export class PowerUpManager {
     const worldZ = cameraZ + SPAWN_DIST_MIN + Math.random() * (SPAWN_DIST_MAX - SPAWN_DIST_MIN);
     const lane = randItem(LANE_POSITIONS);
 
-    // Find inactive slot or push new
     let pu = this.pool.find(p => !p.active);
     if (!pu) {
       pu = { id: this.nextId++, type, worldZ, lanePos: lane, collected: false, active: false };
@@ -138,7 +143,6 @@ export class PowerUpManager {
         player.activatePowerUp(PowerUpType.NITRO_SURGE, cfg.duration);
         break;
       case PowerUpType.SHOCKWAVE:
-        // Shockwave is handled via event in GameScene
         this.emitter.emit('shockwave');
         break;
       case PowerUpType.TIME_SLOW:
@@ -161,14 +165,14 @@ export class PowerUpManager {
     }
 
     // Show floating collect text
-    this.showFloatText(cfg.label, cfg.color);
+    this.showFloatText(`+ ${cfg.label} +`, cfg.color);
   }
 
   private showFloatText(text: string, color: number): void {
     const t = this.floatTexts.find(ft => ft.alpha <= 0);
     if (!t) return;
     const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT * 0.6;
+    const cy = GAME_HEIGHT * 0.52;
     const hex = `#${color.toString(16).padStart(6, '0')}`;
     t.setText(text).setColor(hex).setAlpha(1).setPosition(cx - t.width / 2, cy);
   }
@@ -189,44 +193,44 @@ export class PowerUpManager {
       if (pos.y < 300 || pos.y > GAME_HEIGHT + 20) continue;
 
       const cfg = POWERUP_CONFIGS[pu.type];
-      const baseR = Math.max(6 * pos.scale * 600, 5);
-      const pulse = Math.sin(t * 3 + pu.id) * 0.3 + 1;
+      const baseR = Math.max(7 * pos.scale * 600, 6);
+      const pulse = Math.sin(t * 4 + pu.id) * 0.35 + 1;
       const r = baseR * pulse;
 
-      // Power-ups are floating diamonds, deliberately unlike the grounded
-      // rectangular traffic hazards.
-      g.fillStyle(cfg.color, 0.20);
-      g.fillCircle(pos.x, pos.y, r * 2.3);
+      // Outer pulsating aura
+      g.fillStyle(cfg.color, 0.25);
+      g.fillCircle(pos.x, pos.y, r * 2.4);
+
+      // Rotating diamond icon
       const diamond = [
-        { x: pos.x, y: pos.y - r * 1.3 },
+        { x: pos.x, y: pos.y - r * 1.35 },
         { x: pos.x + r, y: pos.y },
-        { x: pos.x, y: pos.y + r * 1.3 },
+        { x: pos.x, y: pos.y + r * 1.35 },
         { x: pos.x - r, y: pos.y },
       ];
-      g.fillStyle(cfg.color, 1);
+      g.fillStyle(cfg.color, 0.95);
       g.fillPoints(diamond, true);
-      g.lineStyle(Math.max(1, baseR * 0.18), 0xffffff, 0.95);
+      g.lineStyle(Math.max(1.5, baseR * 0.2), 0xffffff, 1.0);
       g.strokePoints(diamond, true);
-      g.fillStyle(cfg.glowColor, 0.95);
-      g.fillCircle(pos.x, pos.y, Math.max(2, r * 0.28));
 
-      // Orbiting fragments sell the pickup as an energy item, not an obstacle.
+      // Bright glowing core
+      g.fillStyle(0xffffff, 0.95);
+      g.fillCircle(pos.x, pos.y, Math.max(2, r * 0.35));
+
+      // Orbiting energy spark particles
       for (let i = 0; i < 3; i++) {
-        const a = t * 2 + (i / 3) * Math.PI * 2;
-        const ox = pos.x + Math.cos(a) * r * 1.5;
-        const oy = pos.y + Math.sin(a) * r * 1.5;
-        g.fillStyle(cfg.color, 0.6);
-        g.fillCircle(ox, oy, Math.max(1.5, baseR * 0.15));
+        const a = t * 3 + (i / 3) * Math.PI * 2;
+        const ox = pos.x + Math.cos(a) * r * 1.6;
+        const oy = pos.y + Math.sin(a) * r * 1.6;
+        g.fillStyle(cfg.glowColor, 0.85);
+        g.fillCircle(ox, oy, Math.max(2, baseR * 0.2));
       }
 
       // Magnet attraction arcs
       if (hasMagnet) {
         const mg = this.magnetGfx;
-        mg.lineStyle(1, cfg.color, 0.25);
-        mg.lineBetween(
-          pos.x, pos.y,
-          GAME_WIDTH * 0.5, GAME_HEIGHT * 0.76,
-        );
+        mg.lineStyle(1.5, cfg.color, 0.4);
+        mg.lineBetween(pos.x, pos.y, GAME_WIDTH * 0.5, GAME_HEIGHT * 0.74);
       }
     }
   }

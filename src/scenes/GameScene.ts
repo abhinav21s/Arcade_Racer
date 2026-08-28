@@ -58,6 +58,9 @@ export class GameScene extends Phaser.Scene {
   // Crash complete flag
   private crashComplete = false;
 
+  // Camera zoom (speed-based with lag)
+  private currentZoom = 1.0;
+
   constructor() {
     super({ key: SCENE.GAME });
   }
@@ -140,11 +143,13 @@ export class GameScene extends Phaser.Scene {
       const carX = this.playerCar.getCarX();
       const carY = this.playerCar.getCarY();
       this.particles.spawnCrashDebris(carX, carY);
+      // CHANGE: much bigger crash shake + red flash
       this.fx.triggerCrashShake();
+      this.cameras.main.flash(180, 255, 30, 30, false);
       this.audio.playCrash();
-      // Slow world briefly on crash
-      this.worldTimeScale = 0.15;
-      this.time.delayedCall(600, () => { this.worldTimeScale = 1; });
+      // Dramatic slowdown on crash
+      this.worldTimeScale = 0.1;
+      this.time.delayedCall(400, () => { this.worldTimeScale = 1; });
     });
 
     // Crash complete → go to game over
@@ -263,8 +268,9 @@ export class GameScene extends Phaser.Scene {
     const newSkins = checkAndUnlockSkins(this.score.score);
     // (silently unlocked; player sees it in menu)
 
-    // ---- Restart shortcut ----
+    // ---- Instant restart: R works at any point once crash has begun ----
     if (Phaser.Input.Keyboard.JustDown(this.restartKey) && this.player.crashed) {
+      this.gameOver = true;
       this.endGame();
     }
   }

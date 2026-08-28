@@ -5,60 +5,70 @@
 import type { TrafficCarType } from '../types';
 
 export interface TrafficCar {
-  id:           number;
-  type:         TrafficCarType;
-  worldZ:       number;    // World Z position (advances at car's speed)
-  lane:         number;    // Lane index 0–3
-  lateralPos:   number;    // Lateral position [-1, 1] (center of lane)
-  speed:        number;    // World units per second
-  active:       boolean;
-  nearMissScored: boolean; // Has near-miss been scored for current player approach
-  carWidth:     number;    // Fraction of road width (collision detection)
-  color:        number;    // Neon color
-  accentColor:  number;    // Secondary/headlight color
+  id:             number;
+  type:           TrafficCarType;
+  worldZ:         number;    // World Z position
+  lane:           number;    // Target lane index 0–3
+  lateralPos:     number;    // Current lateral position [-1, 1]
+  targetLateralPos: number;  // Target lateral position when changing lanes
+  laneChangeTimer: number;   // Timer until next lane change decision
+  blinkerTimer:   number;    // Flashing turn signal timer
+  isChangingLane: boolean;
+  speed:          number;    // World units per second
+  active:         boolean;
+  nearMissScored: boolean;   // Has near-miss been scored for current player approach
+  carWidth:       number;    // Fraction of road width (collision detection)
+  color:          number;    // Primary neon color
+  accentColor:    number;    // Secondary/light color
+  isKnockedOut:   boolean;   // Flung off road from impact/overdrive
+  knockoutVx:     number;    // Knockout lateral velocity
+  knockoutVz:     number;    // Knockout forward velocity
 }
 
 export const TRAFFIC_CAR_CONFIGS: Record<TrafficCarType, {
-  speedMin: number;
-  speedMax: number;
-  carWidth: number;
-  w: number;   // Display width
-  h: number;   // Display height
-  color: number;
+  name:        string;
+  speedMin:    number;
+  speedMax:    number;
+  carWidth:    number;
+  w:           number;   // Display width
+  h:           number;   // Display height
+  color:       number;
   accentColor: number;
 }> = {
   slow: {
-    speedMin: 40,
-    speedMax: 80,
-    carWidth: 0.18,
-    w: 48,
-    h: 28,
+    name:        'CYBER BUS',
+    speedMin:    45,
+    speedMax:    85,
+    carWidth:    0.22,
+    w:           58,
+    h:           42,
     color:       0x00ccff,
-    accentColor: 0x0044ff,
+    accentColor: 0x00ffff,
   },
   mid: {
-    speedMin: 90,
-    speedMax: 150,
-    carWidth: 0.16,
-    w: 44,
-    h: 24,
+    name:        'CYBER SUV',
+    speedMin:    90,
+    speedMax:    155,
+    carWidth:    0.18,
+    w:           48,
+    h:           32,
     color:       0xff6600,
     accentColor: 0xffaa00,
   },
   fast: {
-    speedMin: 160,
-    speedMax: 220,
-    carWidth: 0.14,
-    w: 40,
-    h: 20,
-    color:       0xffff00,
-    accentColor: 0xff9900,
+    name:        'CYBER SUPERCAR',
+    speedMin:    165,
+    speedMax:    235,
+    carWidth:    0.15,
+    w:           44,
+    h:           24,
+    color:       0xff0066,
+    accentColor: 0xffff00,
   },
 };
 
 /** Lane-to-lateral-position mapping (4 lanes) */
 export function laneTolateralPos(lane: number): number {
-  // Lanes 0–3, road is [-1, 1]
   // Road split into 4 lanes: centers at -0.75, -0.25, 0.25, 0.75
   return -0.75 + lane * 0.5;
 }

@@ -1,5 +1,9 @@
 // ============================================================
 // NEON ARCADE RACER — Player Physics & State Machine
+// HIGH PRIORITY CHANGES:
+//  - Snappier steering (instant response, less float at low speed)
+//  - Better drift: speed fully retained, stronger lateral push
+//  - Crash timer shortened for faster restart
 // ============================================================
 
 import Phaser from 'phaser';
@@ -58,7 +62,7 @@ export class Player {
   // Active power-up
   activePowerUp: PowerUpState = null;
   shieldActive:  boolean = false;
-  scoreMultBonus:number  = 1;  // Extra multiplier from SCORE_MULTIPLIER power-up
+  scoreMultBonus:number  = 1;
   private nitroCooldown = 0;
 
   // Near-miss tracking
@@ -125,8 +129,6 @@ export class Player {
       return;
     }
 
-    // Apply time slow for TIME_SLOW power-up — player is NOT slowed
-    // dt is already in real time; we apply worldTimeScale only to world simulation elsewhere
     const inp = this.readInput();
 
     this.updatePowerUp(dt);
@@ -141,8 +143,6 @@ export class Player {
     this.updateCamera(dt);
     this.updateInvincibility(dt);
     this.updateNearMissCooldown(dt);
-
-    // Road-edge feedback
     this.applyOffRoadPenalty(dt);
 
     this.lastLateralPos = this.lateralPos;
@@ -150,21 +150,27 @@ export class Player {
 
   private updateSpeed(inp: InputState, dt: number): void {
     const maxSpeed = this.getMaxSpeed();
+
     if (inp.accel) {
-      this.speed += PLAYER_ACCEL * dt;
+      // SNAPPY: much faster acceleration — reaches top speed in ~2s
+      this.speed += PLAYER_ACCEL * 1.6 * dt;
     } else if (inp.brake) {
-      this.speed -= PLAYER_DECEL * dt;
+      // SNAPPY: hard braking
+      this.speed -= PLAYER_DECEL * 2.0 * dt;
     } else {
-      // Keep a little momentum, but never let coasting feel floaty.
-      this.speed -= PLAYER_COAST_FACTOR * dt;
+      // Natural coast — bleeds off slowly so speed feels earned
+      this.speed -= PLAYER_COAST_FACTOR * 0.8 * dt;
     }
 
-    // Hills are gameplay, not just scenery: climbs scrub speed and descents help.
+    // Hill physics: climbs cost speed, descents gain it
+    this.speed -= this.currentCurve > 0 ? Math.abs(this.currentCurve) * 4 * dt : 0;
     this.speed -= this.currentHill * 7 * dt;
+
+    // DRIFT: fully retain speed — this is the core game-feel reward
     if (this.driftState === 'drifting') {
-      // A committed drift preserves enough speed to encourage stylish driving.
-      this.speed = Math.max(this.speed, maxSpeed * 0.62);
+      this.speed = Math.max(this.speed, maxSpeed * 0.80);
     }
+
     this.speed = clamp(this.speed, 0, maxSpeed);
   }
 
@@ -179,26 +185,33 @@ export class Player {
     const speedFraction = this.speed / PLAYER_MAX_SPEED;
 
     if (this.driftState === 'drifting' || this.driftState === 'entering') {
-      // Drift steering: more forceful, lateral velocity-based
-      const driftForce = STEER_DRIFT_FORCE * (0.45 + speedFraction * 0.7);
-      this.lateralVel += steerInput * driftForce * dt * 4;
-      this.lateralVel *= Math.pow(0.90, dt * 60);  // Long, controllable slide
+      // Drift: strong lateral push, slides freely
+      const driftForce = STEER_DRIFT_FORCE * (0.5 + speedFraction * 0.6);
+      this.lateralVel += steerInput * driftForce * dt * 5;
+      this.lateralVel *= Math.pow(0.88, dt * 60);  // Long, controllable slide
       this.lateralPos += this.lateralVel * dt;
     } else {
-      // Normal steering: direct lateral movement
-      const steerAmount = steerInput * STEER_FORCE * (0.35 + speedFraction * 0.75) * dt;
-      this.lateralPos += steerAmount;
-      this.lateralVel = lerp(this.lateralVel, 0, dt * 8);
+      // SNAPPY normal steering: scales stronger at all speeds, no minimum floor needed
+      // At 30% speed you still feel responsive; at top speed it's agile not loose
+      const steerSpeed = STEER_FORCE * (0.5 + speedFraction * 0.7);
+      if (steerInput !== 0) {
+        // Direct lateral movement — no momentum, just instant response
+        this.lateralPos += steerInput * steerSpeed * dt;
+      }
+      // Quick return to neutral when no input
+      this.lateralVel = lerp(this.lateralVel, 0, dt * 12);
     }
 
-    // Road curve pushes car sideways if not steering against it
-    const curveEffect = -this.currentCurve * (0.3 + speedFraction) * ROAD_CURVE_PUSH * dt * 0.32;
-    this.lateralPos += curveEffect;
+    // Road curve pushes car if not actively correcting — only applies noticeably on actual curves at speed
+    if (Math.abs(this.currentCurve) > 0.05) {
+      const curveEffect = -this.currentCurve * (speedFraction * speedFraction) * ROAD_CURVE_PUSH * dt * 0.25;
+      this.lateralPos += curveEffect;
+    }
 
-    // Soft clamp to road bounds (beyond ±1.0 is off-road, beyond ±1.3 is wall)
+    // Wall collision
     if (Math.abs(this.lateralPos) > 1.3) {
       this.lateralPos = Math.sign(this.lateralPos) * 1.3;
-      this.lateralVel *= -0.3;  // Bounce
+      this.lateralVel *= -0.3;
       this.triggerCrash();
     }
   }
@@ -206,7 +219,8 @@ export class Player {
   private updateDrift(inp: InputState, dt: number): void {
     const speedFraction = this.speed / PLAYER_MAX_SPEED;
     const steerInput = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
-    const canDrift = speedFraction >= MIN_DRIFT_SPEED && Math.abs(steerInput) > 0.1;
+    // CHANGE: can initiate drift at lower speed threshold
+    const canDrift = speedFraction >= MIN_DRIFT_SPEED * 0.85 && Math.abs(steerInput) > 0.1;
 
     this.driftJustEnded = false;
 
@@ -221,7 +235,7 @@ export class Player {
 
       case 'entering':
         this.driftAccum += dt;
-        if (this.driftAccum > 0.15) {
+        if (this.driftAccum > 0.12) {  // Slightly faster to enter full drift
           this.driftState = 'drifting';
         }
         if (!inp.drift || !canDrift) {
@@ -246,16 +260,15 @@ export class Player {
         break;
     }
 
-    // Visual lean
+    // CHANGE: stronger lean — more visual drama during drift
     const targetLean = this.driftState === 'drifting'
-      ? (this.lateralVel > 0 ? -DRIFT_LEAN_MAX : DRIFT_LEAN_MAX) * 1.5
-      : this.lateralVel * DRIFT_LEAN_MAX * 2;
+      ? (this.lateralVel > 0 ? -DRIFT_LEAN_MAX : DRIFT_LEAN_MAX) * 2.0   // was 1.5
+      : this.lateralVel * DRIFT_LEAN_MAX * 2.5;                           // was 2
 
-    this.driftAngle = lerp(this.driftAngle, targetLean, dt * 8);
+    this.driftAngle = lerp(this.driftAngle, targetLean, dt * 10);  // Faster lean response
   }
 
   private updateCamera(dt: number): void {
-    // Advance camera along road (world Z position)
     this.cameraZ += this.speed * dt;
   }
 
@@ -277,18 +290,14 @@ export class Player {
 
   private applyOffRoadPenalty(dt: number): void {
     if (Math.abs(this.lateralPos) > 1.0) {
-      // Slow down and add lateral bounce-back force
       this.speed *= Math.pow(OFF_ROAD_SPEED_PENALTY, dt * 60);
-      // Push back toward road
-      this.lateralPos += -Math.sign(this.lateralPos) * 0.3 * dt;
+      this.lateralPos += -Math.sign(this.lateralPos) * 0.4 * dt;
     }
   }
 
   private updatePowerUp(dt: number): void {
     if (!this.activePowerUp) return;
-
     this.activePowerUp.timeLeft -= dt;
-
     if (this.activePowerUp.timeLeft <= 0) {
       const expiredType = this.activePowerUp.type;
       this.deactivatePowerUp();
@@ -298,14 +307,12 @@ export class Player {
 
   private updateCrash(dt: number): void {
     this.crashTimer -= dt;
-    this.speed = lerp(this.speed, 0, dt * 5);
+    this.speed = lerp(this.speed, 0, dt * 8);  // Faster stop on crash
     if (this.crashTimer <= 0) {
-      // Signal game-over (handled in GameScene)
       this.eventTarget.emit('playerCrashComplete');
     }
   }
 
-  /** Activate nitro boost (called by PowerUpManager or input) */
   activateNitro(): void {
     if (this.crashed) return;
     this.activatePowerUp(PowerUpType.NITRO_SURGE, 3.5);
@@ -315,12 +322,10 @@ export class Player {
 
   activatePowerUp(type: PowerUpType, duration: number): void {
     this.activePowerUp = { type, timeLeft: duration, maxTime: duration };
-
-    // Immediate effects
     switch (type) {
       case PowerUpType.SHIELD:
         this.shieldActive = true;
-        this.activePowerUp = { type, timeLeft: 999, maxTime: 999 }; // Lasts until hit
+        this.activePowerUp = { type, timeLeft: 999, maxTime: 999 };
         break;
       case PowerUpType.OVERDRIVE:
         this.setInvincible(duration);
@@ -338,7 +343,6 @@ export class Player {
   deactivatePowerUp(): void {
     if (!this.activePowerUp) return;
     const type = this.activePowerUp.type;
-
     switch (type) {
       case PowerUpType.TIME_SLOW:
         this.timeSlowFactor = 1;
@@ -356,23 +360,20 @@ export class Player {
     this.activePowerUp = null;
   }
 
-  /** Called when player hits something */
   triggerCrash(fromBarrier = false): void {
-    // Traffic can overlap for several frames; only the first impact should
-    // trigger hit-stop and the crash flash.
     if (this.crashed) return;
     if (this.invincible) return;
     if (this.shieldActive) {
       this.shieldActive = false;
-      this.activePowerUp = null;  // Shield consumed
+      this.activePowerUp = null;
       this.setInvincible(2);
       return;
     }
-    if (this.activePowerUp?.type === PowerUpType.OVERDRIVE) return; // Overdrive prevents crash
-    if (this.activePowerUp?.type === PowerUpType.NITRO_SURGE) return; // Brief invincibility
+    if (this.activePowerUp?.type === PowerUpType.OVERDRIVE) return;
+    if (this.activePowerUp?.type === PowerUpType.NITRO_SURGE) return;
 
     this.crashed = true;
-    this.crashTimer = 0.65; // Quick hit-stop, then get the player back in
+    this.crashTimer = 0.5;  // CHANGE: faster — 0.5s then game over screen
     this.driftState = 'none';
     this.driftAccum = 0;
     this.eventTarget.emit('playerCrash', { pos: this.lateralPos });
@@ -383,7 +384,6 @@ export class Player {
     this.invincibleTimer = Math.max(this.invincibleTimer, duration);
   }
 
-  /** Activate shield from power-up */
   activateShield(): void {
     this.shieldActive = true;
   }

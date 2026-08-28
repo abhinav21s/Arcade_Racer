@@ -34,6 +34,12 @@ export class RoadGenerator {
   private sectionLen  = 80;
 
   constructor() {
+    // Start with a guaranteed straight section for the starting grid
+    this.targetCurve = 0;
+    this.targetHill = 0;
+    this.curCurve = 0;
+    this.curHill = 0;
+    this.sectionCountdown = 80; // First 80 segments are completely straight
     // Pre-generate initial buffer
     this.populate(600);
   }

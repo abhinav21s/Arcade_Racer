@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 import type { Player } from '../player/Player';
 import type { ScoreSystem } from '../scoring/ScoreSystem';
 import { POWERUP_CONFIGS, PowerUpType } from '../powerups/PowerUpTypes';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS, PLAYER_MAX_SPEED } from '../constants';
+import { GAME_WIDTH, GAME_HEIGHT, COLORS, CAR_SKINS } from '../constants';
 import { clamp, lerp, formatNumber } from '../utils/Math';
 
 export class HUD {
@@ -165,8 +165,12 @@ export class HUD {
       this.scoreTxt.clearTint();
     }
 
-    // Speed bar
-    const speedFrac = clamp(player.speed / PLAYER_MAX_SPEED, 0, 1.55);
+    // Speed bar calibrated dynamically to selected car skin tier
+    const skin = CAR_SKINS[player.skinIndex] ?? CAR_SKINS[0];
+    const topKph = skin.topSpeedKph;
+    const baseMax = skin.maxSpeed;
+
+    const speedFrac = clamp(player.speed / baseMax, 0, 1.55);
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT - 22;
     const barW = 340;
@@ -176,7 +180,7 @@ export class HUD {
     g.clear();
 
     const speedColor = player.isBoostActive ? COLORS.NEON_YELLOW : (speedFrac > 0.85 ? 0x00ffff : COLORS.NEON_CYAN);
-    const fillW = Math.max(0, Math.min(barW, barW * (speedFrac / 1.0)));
+    const fillW = Math.max(0, Math.min(barW, barW * Math.min(speedFrac, 1.0)));
 
     // Neon Glow & Fill
     g.fillStyle(speedColor, 0.35);
@@ -187,9 +191,9 @@ export class HUD {
     g.fillStyle(0xffffff, 0.7);
     g.fillRoundedRect(cx - barW / 2, cy - barH / 2, fillW, barH * 0.45, 2);
 
-    // Speed text (km/h — calibrated 0 to 280 km/h, 420 km/h on Nitro Boost)
-    const baseKph = Math.round(Math.min(speedFrac, 1.0) * 280);
-    const boostKph = player.isBoostActive ? Math.round(Math.min((player.speed - PLAYER_MAX_SPEED) / (PLAYER_MAX_SPEED * 0.5), 1) * 140) : 0;
+    // Speed text (km/h — dynamically calibrated to car tier)
+    const baseKph = Math.round(Math.min(speedFrac, 1.0) * topKph);
+    const boostKph = player.isBoostActive ? Math.round(Math.min((player.speed - baseMax) / (baseMax * 0.5), 1) * (topKph * 0.5)) : 0;
     const kph = baseKph + Math.max(0, boostKph);
     this.speedTxt.setText(`${kph} KM/H`);
     this.speedTxt.setColor(player.isBoostActive ? '#ffee00' : '#00ffff');

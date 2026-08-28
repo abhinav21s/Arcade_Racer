@@ -11,10 +11,10 @@ import type { DriftState, PlayerState, PowerUpState } from '../types';
 import { PowerUpType } from '../powerups/PowerUpTypes';
 import type { RoadGenerator } from '../road/RoadGenerator';
 import {
-  PLAYER_MAX_SPEED, PLAYER_BOOST_SPEED, PLAYER_ACCEL, PLAYER_DECEL,
+  PLAYER_DECEL,
   PLAYER_COAST_FACTOR, STEER_FORCE, STEER_DRIFT_FORCE,
   ROAD_CURVE_PUSH, OFF_ROAD_SPEED_PENALTY, MIN_DRIFT_SPEED,
-  DRIFT_LEAN_MAX, SEGMENT_LENGTH, ROAD_WIDTH, KEYS
+  DRIFT_LEAN_MAX, SEGMENT_LENGTH, ROAD_WIDTH, KEYS, CAR_SKINS
 } from '../constants';
 import { clamp, lerp } from '../utils/Math';
 
@@ -130,7 +130,7 @@ export class Player {
 
     this.updatePowerUp(dt);
     this.nitroCooldown = Math.max(0, this.nitroCooldown - dt);
-    if (inp.nitro && this.nitroCooldown <= 0 && this.speed > PLAYER_MAX_SPEED * 0.25) {
+    if (inp.nitro && this.nitroCooldown <= 0 && this.speed > this.baseMaxSpeed * 0.25) {
       this.activateNitro();
       this.nitroCooldown = 6;
     }
@@ -146,11 +146,13 @@ export class Player {
   }
 
   private updateSpeed(inp: InputState, dt: number): void {
+    const skin = CAR_SKINS[this.skinIndex] ?? CAR_SKINS[0];
     const maxSpeed = this.getMaxSpeed();
+    const accel = skin.accel;
 
     if (inp.accel) {
-      // Rapid torque acceleration — reaches top speed in ~1.5s
-      this.speed += PLAYER_ACCEL * dt;
+      // Rapid torque acceleration matched to car tier
+      this.speed += accel * dt;
     } else if (inp.brake) {
       // Hard arcade braking
       this.speed -= PLAYER_DECEL * dt;
@@ -171,14 +173,19 @@ export class Player {
   }
 
   private getMaxSpeed(): number {
-    if (this.activePowerUp?.type === PowerUpType.NITRO_SURGE) return PLAYER_BOOST_SPEED * 1.1;
-    if (this.activePowerUp?.type === PowerUpType.OVERDRIVE) return PLAYER_BOOST_SPEED;
-    return PLAYER_MAX_SPEED;
+    const skin = CAR_SKINS[this.skinIndex] ?? CAR_SKINS[0];
+    if (this.activePowerUp?.type === PowerUpType.NITRO_SURGE) return skin.boostSpeed * 1.1;
+    if (this.activePowerUp?.type === PowerUpType.OVERDRIVE) return skin.boostSpeed;
+    return skin.maxSpeed;
+  }
+
+  get baseMaxSpeed(): number {
+    return (CAR_SKINS[this.skinIndex] ?? CAR_SKINS[0]).maxSpeed;
   }
 
   private updateSteering(inp: InputState, dt: number): void {
     const steerInput = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
-    const speedFraction = this.speed / PLAYER_MAX_SPEED;
+    const speedFraction = this.speedFraction;
 
     if (this.driftState === 'drifting' || this.driftState === 'entering') {
       // Drift: strong lateral push, slides freely
@@ -210,7 +217,7 @@ export class Player {
   }
 
   private updateDrift(inp: InputState, dt: number): void {
-    const speedFraction = this.speed / PLAYER_MAX_SPEED;
+    const speedFraction = this.speedFraction;
     const steerInput = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
     // CHANGE: can initiate drift at lower speed threshold
     const canDrift = speedFraction >= MIN_DRIFT_SPEED * 0.85 && Math.abs(steerInput) > 0.1;
@@ -285,7 +292,7 @@ export class Player {
     // Only apply true off-road drag when fully beyond the outer neon rumble barrier (> 1.12)
     if (Math.abs(this.lateralPos) > 1.12) {
       // Smooth arcade deceleration rather than abrupt speed halting
-      const offRoadMax = PLAYER_MAX_SPEED * 0.75;
+      const offRoadMax = this.baseMaxSpeed * 0.75;
       if (this.speed > offRoadMax) {
         this.speed = lerp(this.speed, offRoadMax, dt * 3.5);
       }
@@ -403,7 +410,7 @@ export class Player {
   }
 
   get speedFraction(): number {
-    return this.speed / PLAYER_MAX_SPEED;
+    return this.speed / this.baseMaxSpeed;
   }
 
   get isDrifting(): boolean {

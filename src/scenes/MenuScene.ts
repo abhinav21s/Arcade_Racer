@@ -17,11 +17,9 @@ export class MenuScene extends Phaser.Scene {
   private skinTxts!: Phaser.GameObjects.Text[];
   private selectedSkinIdx = 0;
   private unlockedSkins:  number[] = [0];
-  private skinCarouselX:  number[] = [];
   private enterKey!: Phaser.Input.Keyboard.Key;
   private leftKey!:  Phaser.Input.Keyboard.Key;
   private rightKey!: Phaser.Input.Keyboard.Key;
-  private rKey!:     Phaser.Input.Keyboard.Key;
 
   private timer = 0;
   private animGfx!: Phaser.GameObjects.Graphics; // animated road preview
@@ -50,7 +48,6 @@ export class MenuScene extends Phaser.Scene {
     this.enterKey = kb.addKey(KEYS.ENTER);
     this.leftKey  = kb.addKey(KEYS.LEFT);
     this.rightKey = kb.addKey(KEYS.RIGHT);
-    this.rKey     = kb.addKey(KEYS.W);
     kb.addKey(KEYS.SPACE).on('down', () => this.startGame());
     this.enterKey.on('down', () => this.startGame());
   }
@@ -133,7 +130,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildSkinSelector(): void {
-    this.add.text(GAME_WIDTH / 2, 175, 'SELECT YOUR RIDE', {
+    this.add.text(GAME_WIDTH / 2, 168, 'SELECT YOUR RIDE', {
       fontFamily: 'Orbitron, monospace',
       fontSize: '14px',
       color: '#00ccff',
@@ -146,26 +143,87 @@ export class MenuScene extends Phaser.Scene {
     const spacing = 140;
     const startX  = GAME_WIDTH / 2 - (count - 1) * spacing / 2;
 
+    // Toast / message banner for locked cars
+    const lockToast = this.add.text(GAME_WIDTH / 2, 320, '', {
+      fontFamily: 'Orbitron, monospace',
+      fontSize: '13px',
+      color: '#ffbb00',
+      stroke: '#000000',
+      strokeThickness: 3,
+      align: 'center',
+    }).setOrigin(0.5, 0.5).setDepth(15).setAlpha(0);
+
     for (let i = 0; i < count; i++) {
       const skin     = CAR_SKINS[i];
       const unlocked = this.unlockedSkins.includes(skin.id);
       const x        = startX + i * spacing;
-      const y        = 250;
+      const y        = 230;
 
       const gfx = this.add.graphics().setDepth(7);
-      gfx.setInteractive(new Phaser.Geom.Rectangle(x - 58, y - 35, 116, 85), Phaser.Geom.Rectangle.Contains);
+      gfx.setInteractive(new Phaser.Geom.Rectangle(x - 52, y - 30, 104, 75), Phaser.Geom.Rectangle.Contains);
+      
       gfx.on('pointerdown', () => {
-        if (!unlocked) return;
+        if (!unlocked) {
+          // Show clear unlock requirement message when clicking locked car
+          lockToast.setText(`🔒 LOCKED — Score ${skin.unlockScore.toLocaleString()} pts to unlock ${skin.name.toUpperCase()}!`);
+          lockToast.setColor('#ffbb00');
+          lockToast.setAlpha(1);
+          lockToast.setScale(1.1);
+
+          this.tweens.killTweensOf(lockToast);
+          this.tweens.add({
+            targets: lockToast,
+            scaleX: 1.0,
+            scaleY: 1.0,
+            duration: 180,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+              this.tweens.add({
+                targets: lockToast,
+                alpha: 0,
+                delay: 2400,
+                duration: 450,
+              });
+            },
+          });
+
+          // Shake card
+          this.tweens.add({
+            targets: gfx,
+            x: '+=5',
+            duration: 45,
+            yoyo: true,
+            repeat: 4,
+          });
+          return;
+        }
+
         this.selectedSkinIdx = this.unlockedSkins.indexOf(skin.id);
         this.updateSkinHighlight();
       });
-      gfx.on('pointerover', () => { if (unlocked) gfx.setAlpha(1); });
+
+      gfx.on('pointerover', () => {
+        if (unlocked) {
+          gfx.setAlpha(1);
+        } else {
+          lockToast.setText(`🔒 Requires ${skin.unlockScore.toLocaleString()} pts to unlock`);
+          lockToast.setColor('#ff9900');
+          lockToast.setAlpha(0.9);
+        }
+      });
+      gfx.on('pointerout', () => {
+        if (!unlocked && lockToast.alpha < 1) lockToast.setAlpha(0);
+      });
+
       this.skinGfxs.push(gfx);
 
-      const txt = this.add.text(x, y + 60, unlocked ? skin.name : '???\n' + skin.unlockScore.toLocaleString() + ' pts', {
+      const labelStr = unlocked ? `${skin.name}\n${skin.topSpeedKph} KM/H` : `LOCKED\n${skin.unlockScore.toLocaleString()} pts`;
+      const txt = this.add.text(x, y + 42, labelStr, {
         fontFamily: 'Orbitron, monospace',
-        fontSize: '9px',
-        color: unlocked ? `#${skin.carColor.toString(16).padStart(6, '0')}` : '#555577',
+        fontSize: '9.5px',
+        color: unlocked ? `#${skin.carColor.toString(16).padStart(6, '0')}` : '#778899',
+        stroke: '#000000',
+        strokeThickness: 2,
         align: 'center',
       }).setOrigin(0.5, 0).setDepth(7);
       this.skinTxts.push(txt);
@@ -173,21 +231,35 @@ export class MenuScene extends Phaser.Scene {
       this.drawSkinCard(gfx, x, y, skin.carColor, skin.trailColor, unlocked, false);
     }
 
-    // Arrow hints
-    this.add.text(GAME_WIDTH / 2 - (count / 2) * spacing - 40, 270, '◄', {
-      fontFamily: 'Orbitron, monospace', fontSize: '24px', color: '#334466',
-    }).setOrigin(0.5, 0.5).setDepth(7);
-    this.add.text(GAME_WIDTH / 2 + (count / 2) * spacing + 20, 270, '►', {
-      fontFamily: 'Orbitron, monospace', fontSize: '24px', color: '#334466',
-    }).setOrigin(0.5, 0.5).setDepth(7);
+    // Interactive Left/Right Arrow Buttons for Car Selection
+    const leftArrow = this.add.text(GAME_WIDTH / 2 - (count / 2) * spacing - 36, 230, '◄', {
+      fontFamily: 'Orbitron, monospace', fontSize: '26px', color: '#00ffff', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5, 0.5).setDepth(8).setInteractive({ useHandCursor: true });
+    leftArrow.on('pointerdown', () => this.navigateSkin(-1));
+    leftArrow.on('pointerover', () => leftArrow.setColor('#ffffff'));
+    leftArrow.on('pointerout', () => leftArrow.setColor('#00ffff'));
 
-    this.add.text(GAME_WIDTH / 2, 335, 'UNLOCK NEW RIDES: 10K  •  25K  •  50K  •  100K SCORE', {
+    const rightArrow = this.add.text(GAME_WIDTH / 2 + (count / 2) * spacing + 36, 230, '►', {
+      fontFamily: 'Orbitron, monospace', fontSize: '26px', color: '#00ffff', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5, 0.5).setDepth(8).setInteractive({ useHandCursor: true });
+    rightArrow.on('pointerdown', () => this.navigateSkin(1));
+    rightArrow.on('pointerover', () => rightArrow.setColor('#ffffff'));
+    rightArrow.on('pointerout', () => rightArrow.setColor('#00ffff'));
+
+    // Car Selection Instruction Pill Badge (Positioned below car labels with no overlap)
+    const selPill = this.add.graphics().setDepth(6);
+    selPill.fillStyle(0x060818, 0.85);
+    selPill.fillRoundedRect(GAME_WIDTH / 2 - 200, 310, 400, 24, 6);
+    selPill.lineStyle(1, 0x00ccff, 0.35);
+    selPill.strokeRoundedRect(GAME_WIDTH / 2 - 200, 310, 400, 24, 6);
+
+    this.add.text(GAME_WIDTH / 2, 322, '◄ ► ARROW KEYS OR CLICK A CAR TO SELECT', {
       fontFamily: 'Rajdhani, monospace',
-      fontSize: '14px',
-      color: '#aa88ff',
+      fontSize: '13px',
+      color: '#00ffff',
       stroke: '#000000',
       strokeThickness: 2,
-    }).setOrigin(0.5, 0).setDepth(7);
+    }).setOrigin(0.5, 0.5).setDepth(7);
 
     this.updateSkinHighlight();
   }
@@ -199,44 +271,45 @@ export class MenuScene extends Phaser.Scene {
     unlocked: boolean, selected: boolean,
   ): void {
     gfx.clear();
-    const w = 100, h = 55;
+    const w = 100, h = 54;
 
     // Card background
-    const bgAlpha = selected ? 0.25 : 0.1;
+    const bgAlpha = selected ? 0.30 : 0.12;
     if (selected) {
-      gfx.fillStyle(carColor, 0.10);
-      gfx.fillRoundedRect(x - w / 2 - 10, y - h / 2 - 10, w + 20, h + 20, 10);
-      gfx.lineStyle(3, trailColor, 0.35);
-      gfx.strokeRoundedRect(x - w / 2 - 6, y - h / 2 - 6, w + 12, h + 12, 8);
+      gfx.fillStyle(carColor, 0.14);
+      gfx.fillRoundedRect(x - w / 2 - 6, y - h / 2 - 6, w + 12, h + 12, 8);
+      gfx.lineStyle(2, carColor, 0.9);
+      gfx.strokeRoundedRect(x - w / 2 - 4, y - h / 2 - 4, w + 8, h + 8, 7);
     }
-    gfx.fillStyle(selected ? carColor : 0x334466, bgAlpha);
+    gfx.fillStyle(selected ? carColor : (unlocked ? 0x162238 : 0x0a0c16), bgAlpha);
     gfx.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
 
     // Border
-    gfx.lineStyle(selected ? 2 : 1, selected ? carColor : 0x334466, selected ? 1 : 0.4);
+    gfx.lineStyle(selected ? 2 : 1, selected ? 0xffffff : (unlocked ? carColor : 0x334466), selected ? 1 : 0.5);
     gfx.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
 
     if (!unlocked) {
-      // Lock icon
-      gfx.fillStyle(0x334466, 0.8);
-      gfx.fillRect(x - 10, y - 8, 20, 16);
-      gfx.lineStyle(2, 0x334466, 0.8);
-      gfx.strokeCircle(x, y - 10, 8);
+      // Lock icon & badge
+      gfx.fillStyle(0x1a2233, 0.9);
+      gfx.fillRoundedRect(x - 12, y - 9, 24, 18, 3);
+      gfx.lineStyle(1.5, 0xffaa00, 0.85);
+      gfx.strokeRoundedRect(x - 12, y - 9, 24, 18, 3);
+      gfx.strokeCircle(x, y - 9, 7);
       return;
     }
 
-    // Car silhouette (simple top-down)
-    const cw = 36, ch = 18;
-    gfx.fillStyle(carColor, 0.9);
+    // Car silhouette (top-down view)
+    const cw = 40, ch = 20;
+    gfx.fillStyle(carColor, 1);
     gfx.fillRoundedRect(x - cw / 2, y - ch / 2, cw, ch, 3);
-    gfx.fillStyle(0x001122, 0.8);
+    gfx.fillStyle(0x020a16, 0.9);
     gfx.fillRoundedRect(x - cw * 0.35, y - ch * 0.35, cw * 0.7, ch * 0.5, 2);
 
     // Trail preview
-    gfx.lineStyle(3, trailColor, 0.7);
-    gfx.lineBetween(x, y + ch / 2 + 2, x, y + ch / 2 + 16);
-    gfx.lineStyle(1, 0xffffff, 0.4);
+    gfx.lineStyle(2.5, trailColor, 0.8);
     gfx.lineBetween(x, y + ch / 2 + 2, x, y + ch / 2 + 14);
+    gfx.lineStyle(1, 0xffffff, 0.6);
+    gfx.lineBetween(x, y + ch / 2 + 2, x, y + ch / 2 + 12);
   }
 
   private updateSkinHighlight(): void {
@@ -246,7 +319,7 @@ export class MenuScene extends Phaser.Scene {
       const selected = this.unlockedSkins[this.selectedSkinIdx] === skin.id;
       const spacing  = 140;
       const x = GAME_WIDTH / 2 - (CAR_SKINS.length - 1) * spacing / 2 + i * spacing;
-      this.drawSkinCard(this.skinGfxs[i], x, 250, skin.carColor, skin.trailColor, unlocked, selected);
+      this.drawSkinCard(this.skinGfxs[i], x, 230, skin.carColor, skin.trailColor, unlocked, selected);
       this.skinTxts[i].setScale(selected ? 1.05 : 1);
     }
   }
@@ -254,12 +327,12 @@ export class MenuScene extends Phaser.Scene {
   private buildHighScores(): void {
     const scores = getHighScores();
     const ox = GAME_WIDTH / 2;
-    const oy = 365;
+    const oy = 358;
 
     this.add.text(ox, oy, '— HIGH SCORES —', {
       fontFamily: 'Orbitron, monospace',
       fontSize: '12px',
-      color: '#445566',
+      color: '#8899bb',
       letterSpacing: 5,
     }).setOrigin(0.5, 0).setDepth(6);
 
@@ -276,10 +349,10 @@ export class MenuScene extends Phaser.Scene {
     } else {
       scores.slice(0, 5).forEach((entry, idx) => {
         const medalColors = ['#ffdd00', '#cccccc', '#cc7733', '#888899', '#667788'];
-        this.add.text(ox, oy + 26 + idx * 22, `${idx + 1}.  ${entry.score.toLocaleString()}  (${entry.distance.toFixed(1)} km)`, {
+        this.add.text(ox, oy + 24 + idx * 20, `${idx + 1}.  ${entry.score.toLocaleString()}  (${entry.distance.toFixed(1)} km)`, {
           fontFamily: 'Rajdhani, monospace',
           fontSize: '17px',
-          color: medalColors[idx] ?? '#445566',
+          color: medalColors[idx] ?? '#778899',
         }).setOrigin(0.5, 0).setDepth(6);
       });
     }
@@ -287,42 +360,68 @@ export class MenuScene extends Phaser.Scene {
 
   private buildStartPrompt(): void {
     const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT - 72;
+    const cy = GAME_HEIGHT - 82;
+
+    // Subtle, Elegant Button Container
+    const btnW = 320;
+    const btnH = 46;
+
     this.startButtonGfx = this.add.graphics().setDepth(7);
-    this.startButtonGfx.fillStyle(COLORS.NEON_CYAN, 0.14);
-    this.startButtonGfx.fillRoundedRect(cx - 190, cy - 25, 380, 50, 8);
-    this.startButtonGfx.lineStyle(2, COLORS.NEON_CYAN, 0.9);
-    this.startButtonGfx.strokeRoundedRect(cx - 190, cy - 25, 380, 50, 8);
+    const drawBtn = (hover: boolean) => {
+      this.startButtonGfx.clear();
+      this.startButtonGfx.fillStyle(0x0a1020, hover ? 0.95 : 0.75);
+      this.startButtonGfx.fillRoundedRect(cx - btnW / 2, cy - btnH / 2, btnW, btnH, 8);
+      this.startButtonGfx.lineStyle(hover ? 1.5 : 1, hover ? 0x00ffff : 0x0088cc, hover ? 0.95 : 0.55);
+      this.startButtonGfx.strokeRoundedRect(cx - btnW / 2, cy - btnH / 2, btnW, btnH, 8);
+    };
+    drawBtn(false);
+
+    // Interactive Button Hit Zone
+    const btnZone = this.add.zone(cx, cy, btnW, btnH).setDepth(9).setInteractive({ useHandCursor: true });
+    btnZone.on('pointerdown', () => this.startGame());
+    btnZone.on('pointerover', () => {
+      drawBtn(true);
+      this.startTxt.setColor('#ffffff');
+      this.startTxt.setScale(1.03);
+    });
+    btnZone.on('pointerout', () => {
+      drawBtn(false);
+      this.startTxt.setColor('#00e5ff');
+      this.startTxt.setScale(1.0);
+    });
 
     this.startTxt = this.add.text(cx, cy, 'START RACE', {
       fontFamily: 'Orbitron, monospace',
-      fontSize: '23px',
-      color: '#00ffff',
+      fontSize: '19px',
+      color: '#00e5ff',
       stroke: '#000000',
       strokeThickness: 3,
-    }).setOrigin(0.5, 0.5).setDepth(8).setInteractive({ useHandCursor: true });
-    this.startTxt.on('pointerdown', () => this.startGame());
-    this.startTxt.on('pointerover', () => this.startTxt.setColor('#ffffff'));
-    this.startTxt.on('pointerout', () => this.startTxt.setColor('#00ffff'));
+      letterSpacing: 2,
+    }).setOrigin(0.5, 0.5).setDepth(8);
 
+    // Gentle, subtle pulse
     this.tweens.add({
       targets:  this.startTxt,
-      scaleX:   1.06,
-      scaleY:   1.06,
-      duration: 700,
+      alpha:    0.85,
+      duration: 1000,
       yoyo:     true,
       repeat:   -1,
       ease:     'Sine.easeInOut',
     });
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 35, 'ARROWS / WASD — DRIVE   •   SPACE / SHIFT — DRIFT   •   E — BOOST', {
-      fontFamily: 'Rajdhani, monospace',
-      fontSize: '13px',
-      color: '#6688aa',
-    }).setOrigin(0.5, 0.5).setDepth(8);
+    // Controls reminder pill
+    const ctrlPill = this.add.graphics().setDepth(7);
+    ctrlPill.fillStyle(0x060818, 0.90);
+    ctrlPill.fillRoundedRect(cx - 300, GAME_HEIGHT - 36, 600, 24, 5);
+    ctrlPill.lineStyle(1, 0x223355, 0.5);
+    ctrlPill.strokeRoundedRect(cx - 300, GAME_HEIGHT - 36, 600, 24, 5);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 14, '◄ ► OR CLICK A CAR TO SELECT', {
-      fontFamily: 'Rajdhani, monospace', fontSize: '12px', color: '#445566',
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 24, 'CONTROLS:  [W / ↑] DRIVE   •   [A/D / ←→] STEER   •   [SPACE] DRIFT   •   [E] BOOST', {
+      fontFamily: 'Rajdhani, monospace',
+      fontSize: '14px',
+      color: '#b0c4de',
+      stroke: '#000000',
+      strokeThickness: 2,
     }).setOrigin(0.5, 0.5).setDepth(8);
   }
 
@@ -335,7 +434,7 @@ export class MenuScene extends Phaser.Scene {
       this.titleTxt.setScale(s, s);
     }
 
-    // Make the selected ride read as a live preview rather than a subtle border.
+    // Make the selected ride read as a live preview
     const selectedId = this.unlockedSkins[this.selectedSkinIdx];
     for (let i = 0; i < CAR_SKINS.length; i++) {
       const selected = CAR_SKINS[i].id === selectedId;

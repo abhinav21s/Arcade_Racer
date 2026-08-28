@@ -134,4 +134,8 @@ export interface SkinDefinition {
   carColor:    number;
   trailColor:  number;
   unlockScore: number;
+  topSpeedKph: number;
+  maxSpeed:    number;
+  boostSpeed:  number;
+  accel:       number;
 }

@@ -63,7 +63,7 @@ export class PlayerCar {
     const speedFrac = this.player.speedFraction;
 
     const rawRoadX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 3);
-    const rawRoadY = roadRenderer.getPlayerScreenY(3);
+    const rawRoadY = roadRenderer.getPlayerScreenY(4);
 
     // 1:1 Immediate horizontal response — 0ms steering latency
     const carX = rawRoadX;
@@ -72,7 +72,8 @@ export class PlayerCar {
     const asphaltRumble = (Math.sin(this.roadRumbleTimer * 2.8) * 0.8 + Math.cos(this.roadRumbleTimer * 4.2) * 0.4) * speedFrac;
     
     const pitchOffset = (this.player.isBoostActive ? 2.5 : speedFrac * 1.5);
-    const targetCarY = Math.min(rawRoadY - CAR_H * 0.35 + asphaltRumble + pitchOffset, GAME_HEIGHT - 60);
+    // Position car with clear separation above bottom speedometer bar (clear view of rear and exhaust)
+    const targetCarY = Math.min(rawRoadY - CAR_H * 0.45 + asphaltRumble + pitchOffset, GAME_HEIGHT - 108);
     const carY = lerp(this.lastY, targetCarY, Math.min(dt * 18, 1.0));
 
     this.wheelSpin += dt * (10 + speedFrac * 40);

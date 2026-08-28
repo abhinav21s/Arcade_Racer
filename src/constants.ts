@@ -83,13 +83,13 @@ export const STYLE_RANKS = [
   { min: 1, label: 'GOOD',      color: 0x9977ff },
 ];
 
-// ---- Unlockable Skins ----
+// ---- Unlockable Skins (with progressive top speed & acceleration tiers) ----
 export const CAR_SKINS = [
-  { id: 0, name: 'NEON PINK',  carColor: 0xff00cc, trailColor: 0x00ffff, unlockScore: 0 },
-  { id: 1, name: 'GHOST CYAN', carColor: 0x00ffff, trailColor: 0xffffff, unlockScore: 10000 },
-  { id: 2, name: 'SOLAR FLARE',carColor: 0xff6600, trailColor: 0xffff00, unlockScore: 25000 },
-  { id: 3, name: 'VOID RUNNER', carColor: 0x220033, trailColor: 0x9900ff, unlockScore: 50000 },
-  { id: 4, name: 'AURORA',     carColor: 0xffffff, trailColor: 0x00ff88, unlockScore: 100000 },
+  { id: 0, name: 'NEON PINK',   carColor: 0xff00cc, trailColor: 0x00ffff, unlockScore: 0,      topSpeedKph: 280, maxSpeed: 3600, boostSpeed: 5400, accel: 2400 },
+  { id: 1, name: 'GHOST CYAN',  carColor: 0x00ffff, trailColor: 0xffffff, unlockScore: 10000,  topSpeedKph: 400, maxSpeed: 5140, boostSpeed: 7700, accel: 2900 },
+  { id: 2, name: 'SOLAR FLARE', carColor: 0xff6600, trailColor: 0xffff00, unlockScore: 25000,  topSpeedKph: 500, maxSpeed: 6425, boostSpeed: 9600, accel: 3400 },
+  { id: 3, name: 'VOID RUNNER', carColor: 0x220033, trailColor: 0x9900ff, unlockScore: 50000,  topSpeedKph: 605, maxSpeed: 7775, boostSpeed: 11600, accel: 3900 },
+  { id: 4, name: 'AURORA',      carColor: 0xffffff, trailColor: 0x00ff88, unlockScore: 100000, topSpeedKph: 735, maxSpeed: 9445, boostSpeed: 14100, accel: 4500 },
 ];
 
 // ---- Key Codes (raw integer values — safe to use before Phaser init) ----

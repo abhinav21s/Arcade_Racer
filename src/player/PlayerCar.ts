@@ -162,26 +162,26 @@ export class PlayerCar {
     g.clear();
 
     const speed = this.player.speedFraction;
-    const intensity = Math.max(0, (speed - 0.45) / 0.55);
+    const isBoost = this.player.isBoostActive;
+    // Only appear at top speeds (75%+) or during Nitro/Overdrive boost
+    const intensity = isBoost ? 1.0 : Math.max(0, (speed - 0.75) / 0.25);
     if (intensity < 0.01) return;
 
-    const cx = GAME_WIDTH  / 2;
-    const cy = GAME_HEIGHT / 2;
-    const lineCount = 22 + Math.floor(intensity * 26);
-    const alpha = intensity * 0.75;
+    const lineCount = isBoost ? 14 : Math.floor(intensity * 8);
+    const alpha = intensity * (isBoost ? 0.38 : 0.22);
 
+    // Draw wind streaks strictly on the outer left and right screen borders
     for (let i = 0; i < lineCount; i++) {
-      const angle = (i / lineCount) * Math.PI * 2 + this.flickerTimer * 0.4;
-      const startR = 30 + (Math.sin(this.flickerTimer * 2.5 + i * 0.7) * 0.5 + 0.5) * 60;
-      const endR   = startR + 160 + intensity * 320;
-      const x1 = cx + Math.cos(angle) * startR;
-      const y1 = cy + Math.sin(angle) * startR;
-      const x2 = cx + Math.cos(angle) * endR;
-      const y2 = cy + Math.sin(angle) * endR;
-      const lineColor = i % 4 === 0 ? COLORS.NEON_MAGENTA
-        : i % 4 === 1 ? 0x6633ff
-        : COLORS.NEON_CYAN;
-      g.lineStyle(0.8 + intensity * 2, lineColor, alpha * (0.6 + 0.4 * Math.random()));
+      const isLeft = i % 2 === 0;
+      const xMargin = (i % 4) * 35 + 25;
+      const x1 = isLeft ? xMargin : GAME_WIDTH - xMargin;
+      const y1 = Math.random() * (GAME_HEIGHT * 0.85);
+      const len = 70 + Math.random() * 110 + intensity * 60;
+      const x2 = isLeft ? x1 + (Math.random() - 0.3) * 15 : x1 - (Math.random() - 0.3) * 15;
+      const y2 = y1 + len;
+
+      const lineColor = i % 3 === 0 ? COLORS.NEON_CYAN : (i % 3 === 1 ? COLORS.NEON_MAGENTA : 0xffffff);
+      g.lineStyle(1.2 + intensity * 0.8, lineColor, alpha * (0.5 + 0.5 * Math.random()));
       g.lineBetween(x1, y1, x2, y2);
     }
   }

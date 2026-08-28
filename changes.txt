@@ -1,11 +1,14 @@
 Neon Arcade Racer – Priority Improvements
 
+//done
 HIGH PRIORITY (Game Feel)
 - Tighter, more responsive steering + snappy acceleration
 - Better drifting: keep speed, stronger trail, score bonus while drifting
 - Camera: slight lag + zoom with speed
 - Speed fantasy: motion blur / speed lines at high speed
 - Crash: screen shake + particles, instant restart
+
+
 
 MEDIUM PRIORITY (Missing Features)
 - Power-ups: Nitro, Shield, Score Multiplier, Shockwave, Time Slow, Magnet, Overdrive
@@ -15,6 +18,8 @@ MEDIUM PRIORITY (Missing Features)
 - Synthwave music + strong engine/drift/crash sounds
 - Particles: neon drift trails, boost particles, crash bursts
 
+
+//need to check whether everything under visual polish is done
 VISUAL POLISH
 - Stronger neon glow on car + road
 - Better pseudo-3D road (curves/hills if possible)

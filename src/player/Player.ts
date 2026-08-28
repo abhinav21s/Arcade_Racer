@@ -288,9 +288,15 @@ export class Player {
   }
 
   private applyOffRoadPenalty(dt: number): void {
-    if (Math.abs(this.lateralPos) > 1.0) {
-      this.speed *= Math.pow(OFF_ROAD_SPEED_PENALTY, dt * 60);
-      this.lateralPos += -Math.sign(this.lateralPos) * 0.4 * dt;
+    // Only apply true off-road drag when fully beyond the outer neon rumble barrier (> 1.12)
+    if (Math.abs(this.lateralPos) > 1.12) {
+      // Smooth arcade deceleration rather than abrupt speed halting
+      const offRoadMax = PLAYER_MAX_SPEED * 0.75;
+      if (this.speed > offRoadMax) {
+        this.speed = lerp(this.speed, offRoadMax, dt * 3.5);
+      }
+      // Gentle guide back toward asphalt
+      this.lateralPos += -Math.sign(this.lateralPos) * 0.35 * dt;
     }
   }
 
@@ -331,7 +337,8 @@ export class Player {
         this.eventTarget.emit('boostStart', { type: 'overdrive' });
         break;
       case PowerUpType.TIME_SLOW:
-        this.timeSlowFactor = 0.25;
+        // Slows traffic only, player maintains 100% full speed
+        this.timeSlowFactor = 0.20;
         break;
       case PowerUpType.SCORE_MULTIPLIER:
         this.scoreMultBonus = Math.min(this.scoreMultBonus * 2, 8);

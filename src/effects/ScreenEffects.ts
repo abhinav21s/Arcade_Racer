@@ -88,14 +88,9 @@ export class ScreenEffects {
 
     this.slowGfx.clear();
     if (this.slowAlpha > 0.01) {
-      // Blue-purple tint overlay to simulate desaturation + slow-mo feel
-      this.slowGfx.fillStyle(0x220044, this.slowAlpha);
+      // Blue-purple tint overlay for cyber matrix feel
+      this.slowGfx.fillStyle(0x330066, this.slowAlpha * 0.4);
       this.slowGfx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-      // Scanlines effect
-      this.slowGfx.fillStyle(0x000000, this.slowAlpha * 0.3);
-      for (let y = 0; y < GAME_HEIGHT; y += 4) {
-        this.slowGfx.fillRect(0, y, GAME_WIDTH, 1);
-      }
     }
 
     // Overdrive overlay: red-purple edge flames

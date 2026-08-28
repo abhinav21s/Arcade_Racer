@@ -53,8 +53,19 @@ export class ParticleManager {
     }
   }
 
+  private poolIndex = 0;
+
   private getParticle(): Particle | null {
-    return this.particles.find(p => !p.active) ?? null;
+    const len = this.particles.length;
+    for (let i = 0; i < len; i++) {
+      const idx = (this.poolIndex + i) % len;
+      const p = this.particles[idx];
+      if (!p.active) {
+        this.poolIndex = (idx + 1) % len;
+        return p;
+      }
+    }
+    return null;
   }
 
   private emit(

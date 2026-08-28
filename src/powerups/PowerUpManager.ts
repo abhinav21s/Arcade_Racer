@@ -65,27 +65,22 @@ export class PowerUpManager {
       this.spawnTimer = POWERUP_SPAWN_INTERVAL * (0.7 + Math.random() * 0.5);
     }
 
-    const activePUs = this.pool.filter(p => p.active && !p.collected);
     const hasMagnet = player.activePowerUp?.type === PowerUpType.MAGNET;
-
-    // Player's front bumper depth in world coordinates
     const playerFrontBumperZ = player.cameraZ + PLAYER_BUMPER_OFFSET_Z;
+    const len = this.pool.length;
 
-    // Magnet effect: pull power-ups toward player
-    if (hasMagnet) {
-      for (const pu of activePUs) {
-        const relZ = pu.worldZ - playerFrontBumperZ;
-        if (relZ > 0 && relZ < SEGMENT_LENGTH * 40) {
-          pu.lanePos += (player.lateralPos - pu.lanePos) * dt * 2.5;
-        }
-      }
-    }
+    for (let i = 0; i < len; i++) {
+      const pu = this.pool[i];
+      if (!pu.active || pu.collected) continue;
 
-    // Precise front-bumper collection check
-    for (const pu of activePUs) {
       const relFrontZ = pu.worldZ - playerFrontBumperZ;
 
-      // In collect depth window (when power-up touches the front hood)
+      // Magnet effect
+      if (hasMagnet && relFrontZ > 0 && relFrontZ < SEGMENT_LENGTH * 40) {
+        pu.lanePos += (player.lateralPos - pu.lanePos) * dt * 2.5;
+      }
+
+      // Precise front-bumper collection check
       if (Math.abs(relFrontZ) <= SEGMENT_LENGTH * 0.85) {
         const latDist = Math.abs(player.lateralPos - pu.lanePos);
         const collectR = hasMagnet ? POWERUP_COLLECT_RADIUS * 2.8 : POWERUP_COLLECT_RADIUS * 1.35;

@@ -40,14 +40,21 @@ export class RoadGenerator {
     this.curCurve = 0;
     this.curHill = 0;
     this.sectionCountdown = 80; // First 80 segments are completely straight
-    // Pre-generate initial buffer
-    this.populate(600);
+    // Pre-generate a massive buffer of 5000 segments (1,000,000 world units) on startup
+    this.populate(5000);
   }
 
   /** Generate enough segments to fill up to index `upTo` */
   private populate(upTo: number): void {
     while (this.genIndex <= upTo) {
       this.generateOne();
+    }
+  }
+
+  /** Ensure segments are available from index start to start+count */
+  ensureAvailable(start: number, count: number): void {
+    if (start + count + 100 >= this.segments.length) {
+      this.populate(this.segments.length + 2000);
     }
   }
 
@@ -141,11 +148,6 @@ export class RoadGenerator {
   /** Get segment by world Z position */
   getSegmentAtZ(worldZ: number, segmentLength: number): RoadSegment {
     return this.getSegment(Math.floor(worldZ / segmentLength));
-  }
-
-  /** Ensure segments are available from index start to start+count */
-  ensureAvailable(start: number, count: number): void {
-    this.populate(start + count + 5);
   }
 
   /** Total generated segment count */

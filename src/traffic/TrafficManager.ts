@@ -140,12 +140,13 @@ export class TrafficManager {
       this.spawn(cameraZ, speedFraction);
     }
 
-    // Update active cars
-    for (const car of this.cars) {
+    // Update active cars in-place without array allocations
+    const len = this.cars.length;
+    for (let i = 0; i < len; i++) {
+      const car = this.cars[i];
       if (!car.active) continue;
 
       if (car.isKnockedOut) {
-        // Physics for car flung away on impact
         car.worldZ += car.knockoutVz * effDt;
         car.lateralPos += car.knockoutVx * effDt;
         if (Math.abs(car.lateralPos) > 2.0 || (car.worldZ - cameraZ) < RECYCLE_BEHIND) {

@@ -1,12 +1,11 @@
 // ============================================================
-// NEON ARCADE RACER — Player Car Visual Representation
+// NEON ARCADE RACER — Player Car Visual Representation (Zero GC)
 // ============================================================
 
 import Phaser from 'phaser';
 import type { Player } from './Player';
 import { CAR_SKINS, COLORS, GAME_WIDTH, GAME_HEIGHT } from '../constants';
 import { lerp } from '../utils/Math';
-import { PowerUpType } from '../powerups/PowerUpTypes';
 
 const CAR_W = 84;
 const CAR_H = 46;
@@ -17,8 +16,13 @@ export class PlayerCar {
   private gfx:     Phaser.GameObjects.Graphics;   // Car body
   private trailGfx:Phaser.GameObjects.Graphics;   // Neon trail
   private glowGfx: Phaser.GameObjects.Graphics;   // Shadow & ground contact glow
-  private trailPoints: Array<{ x: number; y: number; age: number }> = [];
-  private maxTrailPoints = 35;
+
+  // Pre-allocated ring buffer for trail points (Zero memory allocation)
+  private trailPoints: Array<{ x: number; y: number; age: number; active: boolean }> = Array.from(
+    { length: 40 },
+    () => ({ x: 0, y: 0, age: 0, active: false })
+  );
+  private trailHead = 0;
 
   // Shield visual
   private shieldGfx: Phaser.GameObjects.Graphics;
@@ -58,18 +62,14 @@ export class PlayerCar {
     const skin = CAR_SKINS[this.player.skinIndex] ?? CAR_SKINS[0];
     const speedFrac = this.player.speedFraction;
 
-    // Projected road position (depth index 3 places the car grounded in player's forward view)
     const rawRoadX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 3);
     const rawRoadY = roadRenderer.getPlayerScreenY(3);
 
-    // Smooth horizontal tracking with slight tire lag
     const carX = lerp(this.lastX, rawRoadX, Math.min(dt * 24, 1.0));
 
-    // Road suspension vibration: high frequency asphalt rumble that makes the car feel in direct contact with the road
     this.roadRumbleTimer += dt * (15 + speedFrac * 35);
     const asphaltRumble = (Math.sin(this.roadRumbleTimer * 2.8) * 0.8 + Math.cos(this.roadRumbleTimer * 4.2) * 0.4) * speedFrac;
     
-    // Pitch squat on acceleration / dive on braking
     const pitchOffset = (this.player.isBoostActive ? 2.5 : speedFrac * 1.5);
     const targetCarY = Math.min(rawRoadY - CAR_H * 0.35 + asphaltRumble + pitchOffset, GAME_HEIGHT - 60);
     const carY = lerp(this.lastY, targetCarY, Math.min(dt * 12, 1.0));
@@ -82,7 +82,7 @@ export class PlayerCar {
     // ---- Speed lines ----
     this.drawSpeedLines(dt);
 
-    // ---- Shadow & ground contact glow (pins car firmly to asphalt) ----
+    // ---- Shadow & ground contact glow ----
     this.drawGlowAndShadow(carX, carY, skin.carColor, speedFrac);
 
     // ---- Car body ----
@@ -103,29 +103,45 @@ export class PlayerCar {
     const g = this.trailGfx;
     const isDrifting = this.player.isDrifting;
     const isBoost = this.player.isBoostActive;
+    const maxAge = isDrifting ? 0.85 : isBoost ? 0.45 : 0.28;
 
-    // Add new trail point from rear tires
-    if (this.player.speed > 20) {
-      this.trailPoints.unshift({ x, y: y + CAR_H * 0.35, age: 0 });
+    // Add new point into pre-allocated ring buffer
+    if (this.player.speed > 50) {
+      const p = this.trailPoints[this.trailHead];
+      p.x = x;
+      p.y = y + CAR_H * 0.35;
+      p.age = 0;
+      p.active = true;
+      this.trailHead = (this.trailHead + 1) % this.trailPoints.length;
     }
 
-    // Age and cull
-    for (const p of this.trailPoints) p.age += dt;
-    const maxAge = isDrifting ? 0.85 : isBoost ? 0.45 : 0.28;
-    this.trailPoints = this.trailPoints.filter(p => p.age < maxAge).slice(0, this.maxTrailPoints);
+    // Age in-place without array reallocation
+    for (let i = 0; i < this.trailPoints.length; i++) {
+      const p = this.trailPoints[i];
+      if (p.active) {
+        p.age += dt;
+        if (p.age >= maxAge) p.active = false;
+      }
+    }
 
     g.clear();
-    if (this.trailPoints.length < 2) return;
 
-    for (let i = 0; i < this.trailPoints.length - 1; i++) {
-      const p0 = this.trailPoints[i];
-      const p1 = this.trailPoints[i + 1];
+    // Draw active trail points
+    const len = this.trailPoints.length;
+    for (let j = 0; j < len - 1; j++) {
+      const idx0 = (this.trailHead - 1 - j + len) % len;
+      const idx1 = (this.trailHead - 2 - j + len) % len;
+      const p0 = this.trailPoints[idx0];
+      const p1 = this.trailPoints[idx1];
+
+      if (!p0.active || !p1.active) continue;
+
       const t = 1 - (p0.age / maxAge);
       const alpha = t * (isDrifting ? 1.0 : isBoost ? 0.75 : 0.55);
       const width = lerp(isDrifting ? 20 : isBoost ? 10 : 6, 1, p0.age / maxAge);
 
       const color = isDrifting
-        ? (i % 2 === 0 ? COLORS.NEON_MAGENTA : COLORS.NEON_CYAN)
+        ? (j % 2 === 0 ? COLORS.NEON_MAGENTA : COLORS.NEON_CYAN)
         : isBoost ? COLORS.NEON_YELLOW
         : trailColor;
 
@@ -178,18 +194,18 @@ export class PlayerCar {
     const lean = this.player.driftAngle;
     const leanOffset = lean * w * 1.1;
 
-    // 1. Heavy asphalt contact shadow (black ambient occlusion firmly grounding the car to road)
+    // 1. Asphalt shadow
     g.fillStyle(0x000000, 0.85);
     g.fillEllipse(cx + leanOffset * 0.2, cy + h * 0.46, w * 1.15, h * 0.35);
 
-    // 2. Direct tire contact patches on the asphalt
+    // 2. Tire contact patches
     g.fillStyle(0x000000, 0.95);
     g.fillEllipse(cx - w * 0.44 + leanOffset, cy + h * 0.48, w * 0.22, 9);
     g.fillEllipse(cx + w * 0.44 + leanOffset, cy + h * 0.48, w * 0.22, 9);
     g.fillEllipse(cx - w * 0.38 + leanOffset, cy + h * 0.08, w * 0.18, 7);
     g.fillEllipse(cx + w * 0.38 + leanOffset, cy + h * 0.08, w * 0.18, 7);
 
-    // 3. Neon ground underglow reflecting off wet tarmac
+    // 3. Neon ground underglow
     const radius = boost ? 60 : 40;
     const alpha  = boost ? 0.45 : 0.25;
     g.fillStyle(color, alpha * 0.3);
@@ -197,7 +213,7 @@ export class PlayerCar {
     g.fillStyle(color, alpha * 0.7);
     g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.40, radius * 1.6, radius * 0.4);
 
-    // 4. Road tire kick-up sparks at high speed or during drift
+    // 4. Tire sparks
     if (speedFrac > 0.4 || this.player.isDrifting) {
       const sparkCount = this.player.isDrifting ? 6 : 2;
       for (let s = 0; s < sparkCount; s++) {
@@ -228,19 +244,18 @@ export class PlayerCar {
     const w = CAR_W;
     const h = CAR_H;
 
-    // ---- 1. Wide Rubber Tires with Neon Rims (Contacting Road) ----
+    // ---- 1. Wide Rubber Tires with Neon Rims ----
     const tireColor = 0x0a0a14;
     const rimColor = color;
     
-    // Rear Tires (Low and wide, resting directly on the road plane)
+    // Rear Tires
     g.fillStyle(tireColor, 1);
     g.fillRoundedRect(cx - w * 0.54 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
     g.fillRoundedRect(cx + w * 0.35 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
-    // Tire tread pattern & neon rim rings
     g.lineStyle(1.5, rimColor, 0.9);
     g.strokeRoundedRect(cx - w * 0.54 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
     g.strokeRoundedRect(cx + w * 0.35 + leanOffset, cy + h * 0.12, w * 0.19, h * 0.38, 4);
-    // Rotating wheel spokes
+    
     const spokeOffset = Math.sin(this.wheelSpin) * 4;
     g.lineStyle(1, 0xffffff, 0.7);
     g.lineBetween(cx - w * 0.44 + leanOffset - 4, cy + h * 0.31 + spokeOffset, cx - w * 0.44 + leanOffset + 4, cy + h * 0.31 - spokeOffset);
@@ -254,63 +269,63 @@ export class PlayerCar {
     g.strokeRoundedRect(cx - w * 0.46 + leanOffset, cy - h * 0.36, w * 0.14, h * 0.32, 3);
     g.strokeRoundedRect(cx + w * 0.32 + leanOffset, cy - h * 0.36, w * 0.14, h * 0.32, 3);
 
-    // ---- 2. Main Aerodynamic Chassis ----
+    // ---- 2. Zero-Allocation Direct Path Car Body ----
     g.fillStyle(0x0e0e1a, 1);
-    const underTray = [
-      { x: cx - w * 0.46 + leanOffset, y: cy - h * 0.3 },
-      { x: cx + w * 0.46 + leanOffset, y: cy - h * 0.3 },
-      { x: cx + w * 0.44 + leanOffset, y: cy + h * 0.42 },
-      { x: cx - w * 0.44 + leanOffset, y: cy + h * 0.42 },
-    ];
-    g.fillPoints(underTray, true);
+    g.beginPath();
+    g.moveTo(cx - w * 0.46 + leanOffset, cy - h * 0.3);
+    g.lineTo(cx + w * 0.46 + leanOffset, cy - h * 0.3);
+    g.lineTo(cx + w * 0.44 + leanOffset, cy + h * 0.42);
+    g.lineTo(cx - w * 0.44 + leanOffset, cy + h * 0.42);
+    g.closePath();
+    g.fillPath();
 
     // Body Paint Layer
     g.fillStyle(color, 1);
-    const bodyPts = [
-      { x: cx - w * 0.42 + leanOffset, y: cy - h * 0.12 },
-      { x: cx + w * 0.42 + leanOffset, y: cy - h * 0.12 },
-      { x: cx + w * 0.38 + leanOffset, y: cy + h * 0.42 },
-      { x: cx - w * 0.38 + leanOffset, y: cy + h * 0.42 },
-    ];
-    g.fillPoints(bodyPts, true);
+    g.beginPath();
+    g.moveTo(cx - w * 0.42 + leanOffset, cy - h * 0.12);
+    g.lineTo(cx + w * 0.42 + leanOffset, cy - h * 0.12);
+    g.lineTo(cx + w * 0.38 + leanOffset, cy + h * 0.42);
+    g.lineTo(cx - w * 0.38 + leanOffset, cy + h * 0.42);
+    g.closePath();
+    g.fillPath();
     g.lineStyle(2, 0xffffff, 0.45);
-    g.strokePoints(bodyPts, true);
+    g.strokePath();
 
-    // Hood / Front Nose (Tapers forward)
+    // Hood / Front Nose
     g.fillStyle(color, 0.9);
-    const hoodPts = [
-      { x: cx - w * 0.32 + leanOffset, y: cy - h * 0.12 },
-      { x: cx + w * 0.32 + leanOffset, y: cy - h * 0.12 },
-      { x: cx + w * 0.24 + leanOffset, y: cy - h * 0.48 },
-      { x: cx - w * 0.24 + leanOffset, y: cy - h * 0.48 },
-    ];
-    g.fillPoints(hoodPts, true);
+    g.beginPath();
+    g.moveTo(cx - w * 0.32 + leanOffset, cy - h * 0.12);
+    g.lineTo(cx + w * 0.32 + leanOffset, cy - h * 0.12);
+    g.lineTo(cx + w * 0.24 + leanOffset, cy - h * 0.48);
+    g.lineTo(cx - w * 0.24 + leanOffset, cy - h * 0.48);
+    g.closePath();
+    g.fillPath();
     g.lineStyle(1.5, 0xffffff, 0.6);
-    g.strokePoints(hoodPts, true);
+    g.strokePath();
 
-    // Windshield & Canopy (Dark polarized glass with neon cyber frame)
+    // Windshield & Canopy
     g.fillStyle(0x020a14, 0.92);
-    const windPts = [
-      { x: cx - w * 0.25 + leanOffset, y: cy - h * 0.10 },
-      { x: cx + w * 0.25 + leanOffset, y: cy - h * 0.10 },
-      { x: cx + w * 0.18 + leanOffset, y: cy - h * 0.40 },
-      { x: cx - w * 0.18 + leanOffset, y: cy - h * 0.40 },
-    ];
-    g.fillPoints(windPts, true);
+    g.beginPath();
+    g.moveTo(cx - w * 0.25 + leanOffset, cy - h * 0.10);
+    g.lineTo(cx + w * 0.25 + leanOffset, cy - h * 0.10);
+    g.lineTo(cx + w * 0.18 + leanOffset, cy - h * 0.40);
+    g.lineTo(cx - w * 0.18 + leanOffset, cy - h * 0.40);
+    g.closePath();
+    g.fillPath();
     g.lineStyle(2, COLORS.NEON_CYAN, 0.85);
-    g.strokePoints(windPts, true);
+    g.strokePath();
 
     // Center Racing Stripe
     g.fillStyle(0xffffff, 0.35);
     g.fillRect(cx - w * 0.04 + leanOffset, cy - h * 0.46, w * 0.08, h * 0.84);
 
-    // ---- 3. GT Wing Spoiler & Rear Aerodynamics ----
+    // ---- 3. GT Wing Spoiler ----
     g.fillStyle(0x050510, 1);
     g.fillRoundedRect(cx - w * 0.46 + leanOffset, cy + h * 0.34, w * 0.92, h * 0.10, 2);
     g.lineStyle(2.5, color, 1.0);
     g.lineBetween(cx - w * 0.47 + leanOffset, cy + h * 0.34, cx + w * 0.47 + leanOffset, cy + h * 0.34);
 
-    // ---- 4. Headlights (Bright forward projectors) ----
+    // ---- 4. Headlights & Beams ----
     const lightColor = boost ? COLORS.NEON_YELLOW : COLORS.NEON_CYAN;
     g.fillStyle(lightColor, 1);
     g.fillCircle(cx - w * 0.26 + leanOffset, cy - h * 0.46, 5);
@@ -319,7 +334,6 @@ export class PlayerCar {
     g.fillCircle(cx - w * 0.26 + leanOffset, cy - h * 0.46, 10);
     g.fillCircle(cx + w * 0.26 + leanOffset, cy - h * 0.46, 10);
 
-    // Forward light beams onto the road ahead
     g.fillStyle(lightColor, 0.08);
     g.fillTriangle(
       cx - w * 0.26 + leanOffset, cy - h * 0.46,
@@ -332,21 +346,19 @@ export class PlayerCar {
       cx + w * 0.60 + leanOffset, cy - h * 1.6,
     );
 
-    // ---- 5. Glowing Neon LED Taillight Bar ----
+    // ---- 5. Taillights & Exhaust ----
     const tailColor = COLORS.NEON_MAGENTA;
     g.fillStyle(tailColor, 1);
     g.fillRect(cx - w * 0.40 + leanOffset, cy + h * 0.38, w * 0.80, 5);
     g.fillStyle(0xffffff, 0.8);
     g.fillRect(cx - w * 0.35 + leanOffset, cy + h * 0.39, w * 0.70, 2);
 
-    // Dual Rear Exhaust Ports
     g.fillStyle(0x050510, 1);
     g.fillRect(cx - w * 0.24 + leanOffset, cy + h * 0.42, w * 0.48, h * 0.08);
     g.fillStyle(COLORS.NEON_ORANGE, boost ? 1 : 0.6);
     g.fillCircle(cx - w * 0.12 + leanOffset, cy + h * 0.45, 3.5);
     g.fillCircle(cx + w * 0.12 + leanOffset, cy + h * 0.45, 3.5);
 
-    // Boost Exhaust Thruster Flames
     if (boost) {
       const t = this.flickerTimer;
       const flameH = 24 + Math.sin(t * 35) * 10;

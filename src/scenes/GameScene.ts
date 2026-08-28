@@ -222,13 +222,13 @@ export class GameScene extends Phaser.Scene {
     // ---- Update player (always full speed) ----
     this.player.update(dt);
 
-    // ---- Render road ----
+    // ---- Render road (always full speed, constant 60 FPS flow) ----
     this.roadRend.render(
       this.roadGen,
       this.player.cameraZ,
       this.player.lateralPos,
       this.player.speedFraction,
-      this.worldTimeScale,
+      1.0,
     );
 
     // ---- Update traffic (world time scale applies) ----

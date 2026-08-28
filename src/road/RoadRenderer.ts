@@ -212,62 +212,65 @@ export class RoadRenderer {
       g.fillStyle(seg.colors.grass, 1);
       g.fillRect(0, clampedTop, W, bottomY - clampedTop);
 
-      // ---- Road surface ----
+      // ---- Road surface (Zero-allocation path drawing) ----
       g.fillStyle(seg.colors.road, 1);
-      g.fillPoints([
-        { x: botX - botW, y: bottomY },
-        { x: botX + botW, y: bottomY },
-        { x: topX + topW, y: clampedTop },
-        { x: topX - topW, y: clampedTop },
-      ], true, true);
+      g.beginPath();
+      g.moveTo(botX - botW, bottomY);
+      g.lineTo(botX + botW, bottomY);
+      g.lineTo(topX + topW, clampedTop);
+      g.lineTo(topX - topW, clampedTop);
+      g.closePath();
+      g.fillPath();
 
-      // A darker asphalt core makes the roadway readable independently of the
-      // neon shoulders, especially at high speed.
+      // Asphalt core
       g.fillStyle(0x000000, 0.42);
-      g.fillPoints([
-        { x: botX - botW * 0.80, y: bottomY },
-        { x: botX + botW * 0.80, y: bottomY },
-        { x: topX + topW * 0.80, y: clampedTop },
-        { x: topX - topW * 0.80, y: clampedTop },
-      ], true, true);
+      g.beginPath();
+      g.moveTo(botX - botW * 0.80, bottomY);
+      g.lineTo(botX + botW * 0.80, bottomY);
+      g.lineTo(topX + topW * 0.80, clampedTop);
+      g.lineTo(topX - topW * 0.80, clampedTop);
+      g.closePath();
+      g.fillPath();
 
       // ---- Rumble strips (neon glowing edges) ----
-      // Thin neon shoulders keep most of the screen readable as asphalt.
       const rumbleNear = botW * 0.055;
       const rumbleFar  = topW * 0.055;
       g.fillStyle(seg.colors.rumble, 1);
-      // Left
-      g.fillPoints([
-        { x: botX - botW,           y: bottomY },
-        { x: botX - botW + rumbleNear, y: bottomY },
-        { x: topX - topW + rumbleFar,  y: clampedTop },
-        { x: topX - topW,           y: clampedTop },
-      ], true, true);
-      // Right
-      g.fillPoints([
-        { x: botX + botW - rumbleNear, y: bottomY },
-        { x: botX + botW,           y: bottomY },
-        { x: topX + topW,           y: clampedTop },
-        { x: topX + topW - rumbleFar,  y: clampedTop },
-      ], true, true);
+      // Left rumble
+      g.beginPath();
+      g.moveTo(botX - botW, bottomY);
+      g.lineTo(botX - botW + rumbleNear, bottomY);
+      g.lineTo(topX - topW + rumbleFar, clampedTop);
+      g.lineTo(topX - topW, clampedTop);
+      g.closePath();
+      g.fillPath();
+      // Right rumble
+      g.beginPath();
+      g.moveTo(botX + botW - rumbleNear, bottomY);
+      g.lineTo(botX + botW, bottomY);
+      g.lineTo(topX + topW, clampedTop);
+      g.lineTo(topX + topW - rumbleFar, clampedTop);
+      g.closePath();
+      g.fillPath();
 
       // ---- Highway markings: white dashed lane dividers + double yellow centre ----
       const segIdx = cameraSegIdx + i;
       if (Math.floor(segIdx / 2) % 2 === 0) {
         g.fillStyle(0xf4f7ff, 0.94);
         for (let lane = 1; lane < NUM_LANES; lane++) {
-          if (lane === NUM_LANES / 2) continue; // replaced by double-yellow lines below
-          const fraction = (lane / NUM_LANES) * 2 - 1;  // -1 to 1
+          if (lane === NUM_LANES / 2) continue;
+          const fraction = (lane / NUM_LANES) * 2 - 1;
           const markWNear = Math.max(botW * 0.028, 2);
           const markWFar  = Math.max(topW * 0.028, 1);
           const mXNear = botX + fraction * botW;
           const mXFar  = topX + fraction * topW;
-          g.fillPoints([
-            { x: mXNear - markWNear, y: bottomY },
-            { x: mXNear + markWNear, y: bottomY },
-            { x: mXFar  + markWFar,  y: clampedTop },
-            { x: mXFar  - markWFar,  y: clampedTop },
-          ], true, true);
+          g.beginPath();
+          g.moveTo(mXNear - markWNear, bottomY);
+          g.lineTo(mXNear + markWNear, bottomY);
+          g.lineTo(mXFar + markWFar, clampedTop);
+          g.lineTo(mXFar - markWFar, clampedTop);
+          g.closePath();
+          g.fillPath();
           g.lineStyle(Math.max(1, markWNear * 0.25), COLORS.NEON_CYAN, 0.55);
           g.lineBetween(mXNear, bottomY, mXFar, clampedTop);
         }

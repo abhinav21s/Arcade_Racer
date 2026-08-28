@@ -152,23 +152,22 @@ export class Player {
     const maxSpeed = this.getMaxSpeed();
 
     if (inp.accel) {
-      // SNAPPY: much faster acceleration — reaches top speed in ~2s
-      this.speed += PLAYER_ACCEL * 1.6 * dt;
+      // Rapid torque acceleration — reaches top speed in ~1.5s
+      this.speed += PLAYER_ACCEL * dt;
     } else if (inp.brake) {
-      // SNAPPY: hard braking
-      this.speed -= PLAYER_DECEL * 2.0 * dt;
+      // Hard arcade braking
+      this.speed -= PLAYER_DECEL * dt;
     } else {
-      // Natural coast — bleeds off slowly so speed feels earned
-      this.speed -= PLAYER_COAST_FACTOR * 0.8 * dt;
+      // Natural rolling drag
+      this.speed -= PLAYER_COAST_FACTOR * dt;
     }
 
-    // Hill physics: climbs cost speed, descents gain it
-    this.speed -= this.currentCurve > 0 ? Math.abs(this.currentCurve) * 4 * dt : 0;
-    this.speed -= this.currentHill * 7 * dt;
+    // Hill and curve resistance
+    this.speed -= (this.currentHill * 12 + Math.abs(this.currentCurve) * 8) * dt;
 
-    // DRIFT: fully retain speed — this is the core game-feel reward
+    // High speed drift retention: maintains at least 82% of max speed
     if (this.driftState === 'drifting') {
-      this.speed = Math.max(this.speed, maxSpeed * 0.80);
+      this.speed = Math.max(this.speed, maxSpeed * 0.82);
     }
 
     this.speed = clamp(this.speed, 0, maxSpeed);

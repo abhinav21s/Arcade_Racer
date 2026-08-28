@@ -127,7 +127,8 @@ export class ScoreSystem {
   }
 
   get formattedDistance(): string {
-    return `${(this.distance / 1000).toFixed(2)} km`;
+    // 3600 world units/sec = ~280 km/h (~0.078 km/sec)
+    return `${(this.distance / 46000).toFixed(2)} km`;
   }
 
   reset(): void {

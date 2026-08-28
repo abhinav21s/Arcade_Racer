@@ -43,22 +43,22 @@ export const COLORS = {
 };
 
 // ---- Player Physics ----
-export const PLAYER_MAX_SPEED       = 320;   // World units / second (max)
-export const PLAYER_BOOST_SPEED     = 500;   // Speed during nitro/overdrive
-export const PLAYER_ACCEL           = 760;   // World units / sec² — immediate arcade response
-export const PLAYER_DECEL           = 1050;  // Braking force (world units / sec²)
-export const PLAYER_COAST_FACTOR    = 115;   // Natural speed loss (world units / sec²)
-export const STEER_FORCE            = 2.85;  // Direct lateral response
-export const STEER_DRIFT_FORCE      = 5.1;   // Lateral force while drifting
-export const ROAD_CURVE_PUSH        = 1.05;  // Curves require active counter-steering
-export const OFF_ROAD_SPEED_PENALTY = 0.6;   // Speed multiplier when off road
-export const MIN_DRIFT_SPEED        = 0.45;  // Fraction of max speed to allow drift
-export const DRIFT_LEAN_MAX         = 0.30;  // Max visual lean (degrees factor)
+export const PLAYER_MAX_SPEED       = 3600;  // World units / second (280 km/h)
+export const PLAYER_BOOST_SPEED     = 5400;  // World units / second during nitro/overdrive (420 km/h)
+export const PLAYER_ACCEL           = 2400;  // Rapid torque response (0 to top speed in ~1.5s)
+export const PLAYER_DECEL           = 4800;  // Braking force
+export const PLAYER_COAST_FACTOR    = 450;   // Natural friction drag
+export const STEER_FORCE            = 2.85;  // Lateral response
+export const STEER_DRIFT_FORCE      = 5.1;   // Lateral drift force
+export const ROAD_CURVE_PUSH        = 1.05;  // Curve centrifugal force
+export const OFF_ROAD_SPEED_PENALTY = 0.55;  // Speed multiplier when off road
+export const MIN_DRIFT_SPEED        = 0.35;  // Fraction of max speed to allow drift
+export const DRIFT_LEAN_MAX         = 0.30;  // Max visual lean
 
 // ---- Traffic ----
-export const TRAFFIC_SPAWN_INTERVAL = 1.2;   // Seconds between spawns at base speed
+export const TRAFFIC_SPAWN_INTERVAL = 1.2;   // Seconds between spawns
 export const TRAFFIC_POOL_SIZE      = 30;
-export const NEAR_MISS_LATERAL_MIN  = 0.035; // Generous close-pass window
+export const NEAR_MISS_LATERAL_MIN  = 0.035; // Close pass window
 export const NEAR_MISS_LATERAL_MAX  = 0.34;  // Max lateral gap for near-miss
 export const COLLISION_LATERAL      = 0.07;  // Lateral gap for collision
 
@@ -67,7 +67,7 @@ export const POWERUP_SPAWN_INTERVAL = 8;     // Seconds between power-up spawns
 export const POWERUP_COLLECT_RADIUS = 0.18;  // Lateral fraction of road width to collect
 
 // ---- Scoring ----
-export const SCORE_DISTANCE_RATE    = 0.05;  // Points per world unit * speed
+export const SCORE_DISTANCE_RATE    = 0.004; // Points per world unit traveled
 export const SCORE_NEAR_MISS        = 500;
 export const SCORE_DRIFT_RATE       = 200;   // Per second of drifting
 export const SCORE_COMBO_STEP       = 5;     // Combos per multiplier step

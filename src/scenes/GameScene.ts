@@ -288,7 +288,7 @@ export class GameScene extends Phaser.Scene {
 
   private endGame(): void {
     const score = this.score.score;
-    const dist  = this.score.distance / 1000; // km
+    const dist  = this.score.distance / 46000; // km
 
     // Save score
     const entry: HighScoreEntry = {

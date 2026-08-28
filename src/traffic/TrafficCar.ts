@@ -37,8 +37,8 @@ export const TRAFFIC_CAR_CONFIGS: Record<TrafficCarType, {
 }> = {
   slow: {
     name:        'CYBER BUS',
-    speedMin:    45,
-    speedMax:    85,
+    speedMin:    1200,
+    speedMax:    1800,
     carWidth:    0.22,
     w:           58,
     h:           42,
@@ -47,8 +47,8 @@ export const TRAFFIC_CAR_CONFIGS: Record<TrafficCarType, {
   },
   mid: {
     name:        'CYBER SUV',
-    speedMin:    90,
-    speedMax:    155,
+    speedMin:    2000,
+    speedMax:    2600,
     carWidth:    0.18,
     w:           48,
     h:           32,
@@ -57,8 +57,8 @@ export const TRAFFIC_CAR_CONFIGS: Record<TrafficCarType, {
   },
   fast: {
     name:        'CYBER SUPERCAR',
-    speedMin:    165,
-    speedMax:    235,
+    speedMin:    2700,
+    speedMax:    3300,
     carWidth:    0.15,
     w:           44,
     h:           24,

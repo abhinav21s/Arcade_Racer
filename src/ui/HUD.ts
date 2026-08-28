@@ -44,19 +44,26 @@ export class HUD {
   private buildHUD(): void {
     const depth = 80;
 
-    // ---- Top-left: Score ----
-    this.scoreTxt = this.scene.add.text(20, 18, '0', {
+    // ---- Top-left: Score & Distance ----
+    this.scene.add.text(20, 14, 'SCORE', {
+      fontFamily: 'Rajdhani, monospace',
+      fontSize: '12px',
+      color: '#00ccff',
+      letterSpacing: 2,
+    }).setDepth(depth);
+
+    this.scoreTxt = this.scene.add.text(20, 28, '0', {
       fontFamily: 'Orbitron, monospace',
-      fontSize: '36px',
+      fontSize: '34px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 4,
     }).setDepth(depth);
 
-    this.distanceTxt = this.scene.add.text(20, 60, '0.00 km', {
+    this.distanceTxt = this.scene.add.text(20, 68, 'DIST: 0.00 km', {
       fontFamily: 'Rajdhani, monospace',
-      fontSize: '16px',
-      color: '#00ccff',
+      fontSize: '15px',
+      color: '#00ffff',
       stroke: '#000000',
       strokeThickness: 2,
     }).setDepth(depth);
@@ -126,7 +133,7 @@ export class HUD {
 
     // Score text
     this.scoreTxt.setText(formatNumber(this.displayedScore));
-    this.distanceTxt.setText(score.formattedDistance);
+    this.distanceTxt.setText(`DIST: ${score.formattedDistance}`);
 
     // Score color pulse on multiplier > 2
     if (score.totalMultiplier >= 4) {
@@ -161,8 +168,10 @@ export class HUD {
     g.fillStyle(0xffffff, 0.5);
     g.fillRoundedRect(cx - barW / 2, cy - barH / 2, fillW, barH / 2, 2);
 
-    // Speed text (km/h — visual, not real units)
-    const kph = Math.round(player.speed * 1.2);
+    // Speed text (km/h — 0 to 280 km/h, 420 km/h on Nitro Boost)
+    const baseKph = Math.round(speedFrac * 280);
+    const boostKph = player.isBoostActive ? Math.round(Math.min((player.speed - PLAYER_MAX_SPEED) / (PLAYER_MAX_SPEED * 0.5), 1) * 140) : 0;
+    const kph = baseKph + Math.max(0, boostKph);
     this.speedTxt.setText(`${kph} km/h`);
     this.speedTxt.setColor(player.isBoostActive ? '#ffff00' : '#00ffff');
 

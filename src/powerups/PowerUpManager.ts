@@ -140,9 +140,6 @@ export class PowerUpManager {
       case PowerUpType.SHOCKWAVE:
         this.emitter.emit('shockwave');
         break;
-      case PowerUpType.TIME_SLOW:
-        player.activatePowerUp(PowerUpType.TIME_SLOW, cfg.duration);
-        break;
       case PowerUpType.SHIELD:
         player.activateShield();
         player.activatePowerUp(PowerUpType.SHIELD, 999);

@@ -146,12 +146,11 @@ export class RoadRenderer {
 
     generator.ensureAvailable(cameraSegIdx, DRAW_LENGTH + 5);
 
-    // A small delayed lateral follow and speed zoom makes the road feel attached to
-    // the car without moving the HUD or introducing input latency.
-    const targetLagX = -playerLateral * 72;
-    this.cameraLagX = lerp(this.cameraLagX, targetLagX, 0.10);
-    const targetZoom = 1 + Math.min(speedFraction, 1.55) * 0.09;
-    this.cameraZoom = lerp(this.cameraZoom, targetZoom, 0.07);
+    // Tight, instantaneous lateral camera follow for zero-latency steering feel
+    const targetLagX = -playerLateral * 40;
+    this.cameraLagX = lerp(this.cameraLagX, targetLagX, 0.32);
+    const targetZoom = 1 + Math.min(speedFraction, 1.55) * 0.08;
+    this.cameraZoom = lerp(this.cameraZoom, targetZoom, 0.12);
 
     // ---- First Pass: Accumulate curve/hill and project ----
     let accumCurve = 0;  // Accumulated lateral curve offset (world units)
@@ -409,62 +408,158 @@ export class RoadRenderer {
     roadW:  number,
     scale:  number,
   ): void {
-    const sideMultiplier = sprite.side === 'left' ? -1 : 1;
-    const spriteX = roadX + sideMultiplier * (roadW + roadW * sprite.offset * 2);
-    const spriteH = 60 * scale * sprite.scale;
-    const spriteW = 20 * scale * sprite.scale;
+    const spriteH = 65 * scale * sprite.scale;
+    const spriteW = 22 * scale * sprite.scale;
 
     if (roadY < HORIZON_Y || spriteH < 2) return;
 
+    // Handle center archway (spans the entire highway)
+    if (sprite.type === 'arch') {
+      const archLeft  = roadX - roadW * 1.15;
+      const archRight = roadX + roadW * 1.15;
+      const archTop   = roadY - spriteH * 1.35;
+      const beamH     = Math.max(3, spriteH * 0.18);
+      const postW     = Math.max(2.5, spriteW * 0.35);
+
+      // Left & right structural support pillars
+      g.fillStyle(0x0e0e22, 1);
+      g.fillRect(archLeft, archTop, postW, roadY - archTop);
+      g.fillRect(archRight - postW, archTop, postW, roadY - archTop);
+
+      // Neon vertical stripes on pillars
+      g.fillStyle(COLORS.NEON_MAGENTA, 0.85);
+      g.fillRect(archLeft + postW * 0.3, archTop, Math.max(1, postW * 0.4), roadY - archTop);
+      g.fillStyle(COLORS.NEON_CYAN, 0.85);
+      g.fillRect(archRight - postW * 0.7, archTop, Math.max(1, postW * 0.4), roadY - archTop);
+
+      // Overhead crossbeam
+      g.fillStyle(0x121228, 1);
+      g.fillRect(archLeft, archTop, archRight - archLeft, beamH);
+      g.lineStyle(Math.max(1, beamH * 0.25), COLORS.NEON_CYAN, 0.95);
+      g.strokeRect(archLeft, archTop, archRight - archLeft, beamH);
+
+      // Center glowing electronic holographic sign
+      const signW = (archRight - archLeft) * 0.45;
+      const signX = roadX - signW / 2;
+      g.fillStyle(0x001530, 0.95);
+      g.fillRect(signX, archTop + beamH * 0.15, signW, beamH * 0.7);
+      g.fillStyle(COLORS.NEON_YELLOW, 0.9);
+      // Chevrons on gantry sign
+      for (let c = -2; c <= 2; c++) {
+        const cx = roadX + c * (signW * 0.18);
+        g.fillRect(cx - signW * 0.04, archTop + beamH * 0.25, signW * 0.08, beamH * 0.5);
+      }
+      return;
+    }
+
+    const sideMultiplier = sprite.side === 'left' ? -1 : 1;
+    const spriteX = roadX + sideMultiplier * (roadW + roadW * sprite.offset * 2);
+
     switch (sprite.type) {
+      // ---- 1. Highway Neon Streetlamp ----
       case 'lamp': {
-        // Neon lamp post
-        g.fillStyle(0x222244, 1);
+        g.fillStyle(0x181830, 1);
         g.fillRect(spriteX - spriteW * 0.15, roadY - spriteH, spriteW * 0.3, spriteH);
-        // Lamp head
-        g.fillStyle(COLORS.NEON_CYAN, 0.9);
-        g.fillRect(spriteX - spriteW * 0.6, roadY - spriteH, spriteW * 1.2, spriteH * 0.08);
-        // Glow dot
-        g.fillStyle(COLORS.NEON_CYAN, 0.6);
-        const dotR = Math.max(spriteH * 0.06, 2);
-        g.fillCircle(spriteX, roadY - spriteH + spriteH * 0.04, dotR);
+        // Overhanging arm extending toward the road
+        const armDir = sideMultiplier < 0 ? 1 : -1;
+        const armW = spriteW * 0.9;
+        g.fillRect(spriteX, roadY - spriteH, armDir * armW, spriteH * 0.08);
+        // Cyan LED Lamp Head
+        const headX = spriteX + armDir * armW;
+        g.fillStyle(COLORS.NEON_CYAN, 1);
+        g.fillCircle(headX, roadY - spriteH + spriteH * 0.04, Math.max(2, spriteH * 0.06));
+        // Soft ground light cone reflection
+        g.fillStyle(COLORS.NEON_CYAN, 0.08);
+        g.fillEllipse(headX, roadY, spriteW * 2.5, spriteH * 0.25);
         break;
       }
+
+      // ---- 2. Holographic Neon Roadside Billboard ----
+      case 'billboard': {
+        const bw = spriteW * 3.6;
+        const bh = spriteH * 0.9;
+        const by = roadY - spriteH * 1.1;
+
+        // Angled Steel Support Truss
+        g.fillStyle(0x111124, 1);
+        g.fillRect(spriteX - spriteW * 0.18, by + bh, spriteW * 0.36, roadY - (by + bh));
+
+        // Screen Frame
+        g.fillStyle(0x060818, 1);
+        g.fillRoundedRect(spriteX - bw / 2, by, bw, bh, Math.max(2, bw * 0.04));
+        g.lineStyle(Math.max(1, bw * 0.025), COLORS.NEON_MAGENTA, 0.9);
+        g.strokeRoundedRect(spriteX - bw / 2, by, bw, bh, Math.max(2, bw * 0.04));
+
+        // Inner glowing synthwave art
+        g.fillStyle(0x1a0033, 0.85);
+        g.fillRect(spriteX - bw * 0.44, by + bh * 0.12, bw * 0.88, bh * 0.76);
+        // Retro sun / neon grid inside billboard
+        g.fillStyle(COLORS.NEON_YELLOW, 0.9);
+        g.fillCircle(spriteX, by + bh * 0.42, Math.max(3, bh * 0.25));
+        g.fillStyle(COLORS.NEON_CYAN, 0.7);
+        g.fillRect(spriteX - bw * 0.38, by + bh * 0.55, bw * 0.76, Math.max(1.5, bh * 0.08));
+        break;
+      }
+
+      // ---- 3. Curve Warning Reflector Beacon ----
+      case 'beacon': {
+        g.fillStyle(0x222238, 1);
+        g.fillRect(spriteX - spriteW * 0.15, roadY - spriteH * 0.45, spriteW * 0.3, spriteH * 0.45);
+        // Flashing amber/yellow safety strobe
+        g.fillStyle(COLORS.NEON_YELLOW, 1);
+        g.fillCircle(spriteX, roadY - spriteH * 0.42, Math.max(2.5, spriteH * 0.08));
+        // Chevron hazard bar
+        g.fillStyle(0xffffff, 0.85);
+        g.fillRect(spriteX - spriteW * 0.25, roadY - spriteH * 0.28, spriteW * 0.5, Math.max(1.5, spriteH * 0.06));
+        break;
+      }
+
+      // ---- 4. Cyber Megatower A ----
       case 'building_a': {
-        const bw = spriteW * 2.5;
-        const bh = spriteH * 1.4;
-        // Building body
-        g.fillStyle(0x0a0025, 1);
+        const bw = spriteW * 3.2;
+        const bh = spriteH * 1.8;
+        // Dark Obsidian Tower Base
+        g.fillStyle(0x07061a, 1);
         g.fillRect(spriteX - bw / 2, roadY - bh, bw, bh);
-        // Neon accent
-        g.lineStyle(1, COLORS.NEON_PURPLE, 0.7);
+        // Neon structural contour
+        g.lineStyle(Math.max(1, bw * 0.02), COLORS.NEON_PURPLE, 0.75);
         g.strokeRect(spriteX - bw / 2, roadY - bh, bw, bh);
-        // Windows
-        g.fillStyle(COLORS.NEON_BLUE, 0.5);
-        const wrows = Math.max(2, Math.floor(bh / (spriteH * 0.2)));
-        for (let r = 0; r < wrows; r++) {
-          const wy = roadY - bh + bh * 0.1 + r * (bh * 0.15);
-          if (wy > roadY) break;
-          g.fillRect(spriteX - bw * 0.3, wy, bw * 0.2, Math.max(spriteH * 0.04, 2));
-          g.fillRect(spriteX + bw * 0.1, wy, bw * 0.2, Math.max(spriteH * 0.04, 2));
+
+        // Rooftop antenna beacon
+        g.fillStyle(0xff0055, 0.9);
+        g.fillRect(spriteX - 1, roadY - bh - spriteH * 0.2, 2, spriteH * 0.2);
+        g.fillCircle(spriteX, roadY - bh - spriteH * 0.2, Math.max(2, spriteH * 0.04));
+
+        // Illuminated window matrix
+        g.fillStyle(COLORS.NEON_CYAN, 0.65);
+        const rows = Math.min(6, Math.floor(bh / (spriteH * 0.25)));
+        for (let r = 0; r < rows; r++) {
+          const wy = roadY - bh + bh * 0.12 + r * (bh * 0.14);
+          if (wy > roadY - 5) break;
+          g.fillRect(spriteX - bw * 0.38, wy, bw * 0.24, Math.max(2, spriteH * 0.04));
+          g.fillRect(spriteX + bw * 0.14, wy, bw * 0.24, Math.max(2, spriteH * 0.04));
         }
         break;
       }
+
+      // ---- 5. Cyber Megatower B ----
       case 'building_b': {
-        const bw = spriteW * 1.8;
-        const bh = spriteH * 2;
-        g.fillStyle(0x080020, 1);
+        const bw = spriteW * 2.4;
+        const bh = spriteH * 2.3;
+        g.fillStyle(0x0a0418, 1);
         g.fillRect(spriteX - bw / 2, roadY - bh, bw, bh);
-        g.lineStyle(1, COLORS.NEON_MAGENTA, 0.5);
-        g.lineBetween(spriteX - bw / 2, roadY - bh, spriteX + bw / 2, roadY - bh);
-        g.fillStyle(COLORS.NEON_MAGENTA, 0.4);
-        const signH = Math.max(spriteH * 0.06, 2);
-        g.fillRect(spriteX - bw * 0.35, roadY - bh + spriteH * 0.2, bw * 0.7, signH);
+        g.lineStyle(Math.max(1, bw * 0.02), COLORS.NEON_MAGENTA, 0.65);
+        g.strokeRect(spriteX - bw / 2, roadY - bh, bw, bh);
+
+        // Glowing vertical facade accent
+        g.fillStyle(COLORS.NEON_MAGENTA, 0.8);
+        g.fillRect(spriteX - bw * 0.06, roadY - bh + bh * 0.08, bw * 0.12, bh * 0.82);
         break;
       }
+
       case 'barrier': {
-        g.fillStyle(COLORS.NEON_CYAN, 0.8);
-        g.fillRect(spriteX - spriteW * 0.3, roadY - spriteH * 0.3, spriteW * 0.6, spriteH * 0.3);
+        g.fillStyle(COLORS.NEON_CYAN, 0.85);
+        g.fillRect(spriteX - spriteW * 0.35, roadY - spriteH * 0.3, spriteW * 0.7, spriteH * 0.3);
         break;
       }
     }

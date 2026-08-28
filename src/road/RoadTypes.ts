@@ -10,8 +10,8 @@ export interface SegmentColors {
 }
 
 export interface RoadSprite {
-  type:       'building_a' | 'building_b' | 'lamp' | 'barrier';
-  side:       'left' | 'right';
+  type:       'building_a' | 'building_b' | 'lamp' | 'barrier' | 'billboard' | 'arch' | 'beacon';
+  side:       'left' | 'right' | 'center';
   offset:     number;    // Lateral offset beyond road edge (normalized, 0=edge, 1=far offscreen)
   scale:      number;    // Visual scale factor
 }

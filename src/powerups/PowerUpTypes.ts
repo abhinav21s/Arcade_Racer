@@ -5,7 +5,6 @@
 export enum PowerUpType {
   NITRO_SURGE     = 'NITRO_SURGE',
   SHOCKWAVE       = 'SHOCKWAVE',
-  TIME_SLOW       = 'TIME_SLOW',
   SHIELD          = 'SHIELD',
   SCORE_MULTIPLIER= 'SCORE_MULTIPLIER',
   MAGNET          = 'MAGNET',
@@ -41,22 +40,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration:    0,   // Instant effect
     icon:        'W',
   },
-  [PowerUpType.TIME_SLOW]: {
-    type:        PowerUpType.TIME_SLOW,
-    label:       'TIME SLOW',
-    description: 'Slow the world, not you',
-    color:       0xaa00ff,
-    glowColor:   0xff00ff,
-    duration:    4.0,
-    icon:        'T',
-  },
   [PowerUpType.SHIELD]: {
     type:        PowerUpType.SHIELD,
     label:       'SHIELD',
     description: 'Absorb one collision',
     color:       0x00ffaa,
     glowColor:   0x00ccff,
-    duration:    0,   // Until hit (checked separately)
+    duration:    0,   // Until hit
     icon:        'S',
   },
   [PowerUpType.SCORE_MULTIPLIER]: {
@@ -93,7 +83,6 @@ export const POWERUP_SPAWN_POOL: PowerUpType[] = [
   PowerUpType.NITRO_SURGE,
   PowerUpType.NITRO_SURGE,
   PowerUpType.SHOCKWAVE,
-  PowerUpType.TIME_SLOW,
   PowerUpType.SHIELD,
   PowerUpType.SHIELD,
   PowerUpType.SCORE_MULTIPLIER,

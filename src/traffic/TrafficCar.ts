@@ -30,38 +30,41 @@ export const TRAFFIC_CAR_CONFIGS: Record<TrafficCarType, {
   speedMin:    number;
   speedMax:    number;
   carWidth:    number;
-  w:           number;   // Display width
-  h:           number;   // Display height
+  w:           number;   // Base display width in px (1:1 with PlayerCar at bumper distance)
+  h:           number;   // Base display height in px
   color:       number;
   accentColor: number;
 }> = {
+  // TRUCK — Massive semi-truck / big rig (1.45x wider, 1.8x taller than player car)
   slow: {
-    name:        'CYBER BUS',
-    speedMin:    1200,
-    speedMax:    1800,
-    carWidth:    0.22,
-    w:           58,
-    h:           42,
+    name:        'TRUCK',
+    speedMin:    1100,
+    speedMax:    1700,
+    carWidth:    0.28,  // widest — occupies large lane presence
+    w:           122,   // towering wide footprint
+    h:           84,    // tall box container
     color:       0x00ccff,
     accentColor: 0x00ffff,
   },
+  // SUV — Bulky crossover / urban utility (1.17x wider, 1.26x taller than player car)
   mid: {
-    name:        'CYBER SUV',
-    speedMin:    2000,
+    name:        'SUV',
+    speedMin:    1900,
     speedMax:    2600,
-    carWidth:    0.18,
-    w:           48,
-    h:           32,
+    carWidth:    0.20,
+    w:           98,
+    h:           58,
     color:       0xff6600,
     accentColor: 0xffaa00,
   },
+  // SPORTS CAR / RIVAL RACER — Exact 1:1 scale with player's supercar
   fast: {
-    name:        'CYBER SUPERCAR',
+    name:        'SPORTS CAR',
     speedMin:    2700,
-    speedMax:    3300,
-    carWidth:    0.15,
-    w:           44,
-    h:           24,
+    speedMax:    3400,
+    carWidth:    0.16,
+    w:           84,    // Identical width to player car (84px)
+    h:           46,    // Identical height to player car (46px)
     color:       0xff0066,
     accentColor: 0xffff00,
   },

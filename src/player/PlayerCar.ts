@@ -65,14 +65,15 @@ export class PlayerCar {
     const rawRoadX = roadRenderer.getPlayerScreenX(this.player.lateralPos, 3);
     const rawRoadY = roadRenderer.getPlayerScreenY(3);
 
-    const carX = lerp(this.lastX, rawRoadX, Math.min(dt * 24, 1.0));
+    // 1:1 Immediate horizontal response — 0ms steering latency
+    const carX = rawRoadX;
 
     this.roadRumbleTimer += dt * (15 + speedFrac * 35);
     const asphaltRumble = (Math.sin(this.roadRumbleTimer * 2.8) * 0.8 + Math.cos(this.roadRumbleTimer * 4.2) * 0.4) * speedFrac;
     
     const pitchOffset = (this.player.isBoostActive ? 2.5 : speedFrac * 1.5);
     const targetCarY = Math.min(rawRoadY - CAR_H * 0.35 + asphaltRumble + pitchOffset, GAME_HEIGHT - 60);
-    const carY = lerp(this.lastY, targetCarY, Math.min(dt * 12, 1.0));
+    const carY = lerp(this.lastY, targetCarY, Math.min(dt * 18, 1.0));
 
     this.wheelSpin += dt * (10 + speedFrac * 40);
 
@@ -196,32 +197,37 @@ export class PlayerCar {
 
     // 1. Asphalt shadow
     g.fillStyle(0x000000, 0.85);
-    g.fillEllipse(cx + leanOffset * 0.2, cy + h * 0.46, w * 1.15, h * 0.35);
+    g.fillEllipse(cx + leanOffset * 0.2, cy + h * 0.46, w * 1.25, h * 0.38);
 
     // 2. Tire contact patches
     g.fillStyle(0x000000, 0.95);
-    g.fillEllipse(cx - w * 0.44 + leanOffset, cy + h * 0.48, w * 0.22, 9);
-    g.fillEllipse(cx + w * 0.44 + leanOffset, cy + h * 0.48, w * 0.22, 9);
-    g.fillEllipse(cx - w * 0.38 + leanOffset, cy + h * 0.08, w * 0.18, 7);
-    g.fillEllipse(cx + w * 0.38 + leanOffset, cy + h * 0.08, w * 0.18, 7);
+    g.fillEllipse(cx - w * 0.44 + leanOffset, cy + h * 0.48, w * 0.24, 10);
+    g.fillEllipse(cx + w * 0.44 + leanOffset, cy + h * 0.48, w * 0.24, 10);
+    g.fillEllipse(cx - w * 0.38 + leanOffset, cy + h * 0.08, w * 0.20, 8);
+    g.fillEllipse(cx + w * 0.38 + leanOffset, cy + h * 0.08, w * 0.20, 8);
 
-    // 3. Neon ground underglow
-    const radius = boost ? 60 : 40;
-    const alpha  = boost ? 0.45 : 0.25;
-    g.fillStyle(color, alpha * 0.3);
-    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.38, radius * 2.6, radius * 0.65);
-    g.fillStyle(color, alpha * 0.7);
-    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.40, radius * 1.6, radius * 0.4);
+    // 3. Multi-layer High-Intensity Neon Ground Underglow
+    const radius = boost ? 75 : 52;
+    const alpha  = boost ? 0.65 : 0.40;
+    // Outer soft bloom
+    g.fillStyle(color, alpha * 0.25);
+    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.38, radius * 3.0, radius * 0.85);
+    // Mid glow
+    g.fillStyle(color, alpha * 0.65);
+    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.40, radius * 1.9, radius * 0.50);
+    // Intense hot center
+    g.fillStyle(0xffffff, alpha * 0.45);
+    g.fillEllipse(cx + leanOffset * 0.3, cy + h * 0.41, radius * 0.9, radius * 0.25);
 
-    // 4. Tire sparks
-    if (speedFrac > 0.4 || this.player.isDrifting) {
-      const sparkCount = this.player.isDrifting ? 6 : 2;
+    // 4. Dynamic tire friction sparks on speed / drift
+    if (speedFrac > 0.35 || this.player.isDrifting) {
+      const sparkCount = this.player.isDrifting ? 8 : 3;
       for (let s = 0; s < sparkCount; s++) {
         const side = s % 2 === 0 ? -1 : 1;
-        const sx = cx + side * (w * 0.44) + leanOffset + (Math.random() - 0.5) * 8;
-        const sy = cy + h * 0.48 + Math.random() * 6;
-        g.fillStyle(this.player.isDrifting ? COLORS.NEON_YELLOW : color, 0.8);
-        g.fillCircle(sx, sy, 1.5 + Math.random() * 1.5);
+        const sx = cx + side * (w * 0.44) + leanOffset + (Math.random() - 0.5) * 10;
+        const sy = cy + h * 0.48 + Math.random() * 8;
+        g.fillStyle(this.player.isDrifting ? COLORS.NEON_YELLOW : color, 0.9);
+        g.fillCircle(sx, sy, 1.5 + Math.random() * 2);
       }
     }
   }

@@ -125,17 +125,25 @@ export class GameOverScene extends Phaser.Scene {
     const newSkins = checkAndUnlockSkins(this.score);
     if (newSkins.length > 0) {
       const newSkinNames = newSkins.map(id => SKINS.find(s => s.id === id)?.name ?? 'Unknown').join(', ');
-      const unlockTxt = this.add.text(cx, 580, `🔓 UNLOCKED: ${newSkinNames}`, {
+      
+      const badgeGfx = this.add.graphics().setDepth(4);
+      badgeGfx.fillStyle(0x060818, 0.9);
+      badgeGfx.fillRoundedRect(cx - 200, 568, 400, 44, 8);
+      badgeGfx.lineStyle(2, 0xffdd00, 0.85);
+      badgeGfx.strokeRoundedRect(cx - 200, 568, 400, 44, 8);
+
+      const unlockTxt = this.add.text(cx, 578, `🏆 NEW CAR UNLOCKED: ${newSkinNames.toUpperCase()}!`, {
         fontFamily: 'Orbitron, monospace',
-        fontSize: '14px',
+        fontSize: '15px',
         color: '#ffdd00',
         stroke: '#000000',
-        strokeThickness: 2,
+        strokeThickness: 3,
       }).setOrigin(0.5, 0).setDepth(5);
+
       this.tweens.add({
-        targets: unlockTxt,
-        alpha: 0.3,
-        duration: 500,
+        targets: [unlockTxt, badgeGfx],
+        alpha: 0.45,
+        duration: 450,
         yoyo: true,
         repeat: -1,
       });

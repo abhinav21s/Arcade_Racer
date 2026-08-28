@@ -99,29 +99,63 @@ export class RoadGenerator {
     const colorIdx = Math.floor(i / 3) % 2;
     const colors = { ...COLOR_PAIRS[colorIdx] };
 
-    // Roadside sprites
+    // Roadside sprites & Cyberpunk scenery
     const sprites: RoadSprite[] = [];
-    if (i % 10 === 0) {
+
+    // 1. Neon Highway Streetlamps (rhythmic passing)
+    if (i % 8 === 0) {
       sprites.push({
         type: 'lamp',
         side: 'left',
-        offset: 0.05,
+        offset: 0.04,
         scale: 1.0,
       });
       sprites.push({
         type: 'lamp',
         side: 'right',
-        offset: 0.05,
+        offset: 0.04,
         scale: 1.0,
       });
     }
-    if (i % 7 === 0) {
+
+    // 2. Reflective Curve Beacons along turns
+    if (Math.abs(this.curCurve) > 0.4 && i % 3 === 0) {
+      sprites.push({
+        type: 'beacon',
+        side: this.curCurve > 0 ? 'right' : 'left',
+        offset: 0.01,
+        scale: 0.8,
+      });
+    }
+
+    // 3. Cyber Highway Overhead Laser Gantries / Archways (spectacular fly-under)
+    if (i > 30 && i % 42 === 0) {
+      sprites.push({
+        type: 'arch',
+        side: 'center',
+        offset: 0,
+        scale: 1.25,
+      });
+    }
+
+    // 4. Holographic Neon Roadside Billboards
+    if (i > 15 && i % 24 === 0) {
+      sprites.push({
+        type: 'billboard',
+        side: i % 48 === 0 ? 'left' : 'right',
+        offset: 0.22 + Math.random() * 0.15,
+        scale: 1.1 + Math.random() * 0.4,
+      });
+    }
+
+    // 5. Cyberpunk Mega-Structures & High-Rises
+    if (i % 6 === 0) {
       const btype: RoadSprite['type'] = Math.random() < 0.5 ? 'building_a' : 'building_b';
       sprites.push({
         type: btype,
         side: Math.random() < 0.5 ? 'left' : 'right',
-        offset: 0.3 + Math.random() * 0.5,
-        scale: 0.8 + Math.random() * 0.6,
+        offset: 0.28 + Math.random() * 0.55,
+        scale: 0.85 + Math.random() * 0.75,
       });
     }
 

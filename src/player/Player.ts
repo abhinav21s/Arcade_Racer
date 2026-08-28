@@ -72,9 +72,6 @@ export class Player {
   // For scoring
   lastLateralPos: number = 0;
 
-  // Time slow factor (set by TIME_SLOW power-up)
-  timeSlowFactor: number = 1;
-
   // Road query (set from GameScene each frame)
   private currentCurve: number = 0;
   private currentHill:  number = 0;
@@ -185,26 +182,23 @@ export class Player {
 
     if (this.driftState === 'drifting' || this.driftState === 'entering') {
       // Drift: strong lateral push, slides freely
-      const driftForce = STEER_DRIFT_FORCE * (0.5 + speedFraction * 0.6);
+      const driftForce = STEER_DRIFT_FORCE * (0.6 + speedFraction * 0.5);
       this.lateralVel += steerInput * driftForce * dt * 5;
-      this.lateralVel *= Math.pow(0.88, dt * 60);  // Long, controllable slide
+      this.lateralVel *= Math.pow(0.88, dt * 60);
       this.lateralPos += this.lateralVel * dt;
     } else {
-      // SNAPPY normal steering: scales stronger at all speeds, no minimum floor needed
-      // At 30% speed you still feel responsive; at top speed it's agile not loose
-      const steerSpeed = STEER_FORCE * (0.5 + speedFraction * 0.7);
+      // Direct, instantaneous arcade steering — 0 latency, 0 lag
+      const steerSpeed = STEER_FORCE * (0.65 + speedFraction * 0.65);
       if (steerInput !== 0) {
-        // Direct lateral movement — no momentum, just instant response
         this.lateralPos += steerInput * steerSpeed * dt;
       }
-      // Quick return to neutral when no input
-      this.lateralVel = lerp(this.lateralVel, 0, dt * 12);
+      this.lateralVel = lerp(this.lateralVel, 0, dt * 16);
     }
 
-    // Road curve pushes car if not actively correcting — only applies noticeably on actual curves at speed
-    if (Math.abs(this.currentCurve) > 0.05) {
-      const curveEffect = -this.currentCurve * (speedFraction * speedFraction) * ROAD_CURVE_PUSH * dt * 0.25;
-      this.lateralPos += curveEffect;
+    // Only apply gentle centrifugal road drift when NOT actively steering
+    if (steerInput === 0 && Math.abs(this.currentCurve) > 0.1) {
+      const curveDrift = -this.currentCurve * (speedFraction * speedFraction) * ROAD_CURVE_PUSH * dt * 0.12;
+      this.lateralPos += curveDrift;
     }
 
     // Wall collision
@@ -336,10 +330,6 @@ export class Player {
         this.setInvincible(duration);
         this.eventTarget.emit('boostStart', { type: 'overdrive' });
         break;
-      case PowerUpType.TIME_SLOW:
-        // Slows traffic only, player maintains 100% full speed
-        this.timeSlowFactor = 0.20;
-        break;
       case PowerUpType.SCORE_MULTIPLIER:
         this.scoreMultBonus = Math.min(this.scoreMultBonus * 2, 8);
         break;
@@ -350,9 +340,6 @@ export class Player {
     if (!this.activePowerUp) return;
     const type = this.activePowerUp.type;
     switch (type) {
-      case PowerUpType.TIME_SLOW:
-        this.timeSlowFactor = 1;
-        break;
       case PowerUpType.SCORE_MULTIPLIER:
         this.scoreMultBonus = Math.max(1, this.scoreMultBonus / 2);
         break;
@@ -410,7 +397,7 @@ export class Player {
     this.activePowerUp = null;
     this.shieldActive = false;
     this.scoreMultBonus = 1;
-    this.timeSlowFactor = 1;
+
     this.nearMissCooldown = 0;
     this.nitroCooldown = 0;
   }

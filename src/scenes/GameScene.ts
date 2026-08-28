@@ -176,7 +176,7 @@ export class GameScene extends Phaser.Scene {
     this.events2.on('shockwave', () => {
       this.traffic.applyShockwave(this.player.cameraZ);
       this.particles.spawnShockwave(GAME_WIDTH / 2, GAME_HEIGHT * 0.75);
-      this.fx.triggerShockwaveShake();
+      this.fx.triggerCrashShake();
       this.audio.playShockwave();
     });
 
@@ -209,10 +209,6 @@ export class GameScene extends Phaser.Scene {
       this.togglePause();
     }
     if (this.pausedFlag) return;
-
-    // ---- World time scale (TIME_SLOW power-up) ----
-    const targetWTS = this.player.timeSlowFactor < 1 ? 0.25 : 1;
-    this.worldTimeScale = Phaser.Math.Linear(this.worldTimeScale, targetWTS, Math.min(dt * 6, 1));
 
     // ---- Get road data at camera position ----
     const cameraSegIdx = Math.floor(this.player.cameraZ / SEGMENT_LENGTH);
@@ -264,9 +260,18 @@ export class GameScene extends Phaser.Scene {
     // ---- Update audio ----
     this.audio.update(dt, this.player, this.score);
 
-    // ---- Check skin unlocks ----
+    // ---- Check skin unlocks live during run ----
     const newSkins = checkAndUnlockSkins(this.score.score);
-    // (silently unlocked; player sees it in menu)
+    if (newSkins.length > 0) {
+      for (const skinId of newSkins) {
+        const unlockedSkin = CAR_SKINS.find(s => s.id === skinId);
+        if (unlockedSkin) {
+          this.hud.showUnlockBanner(unlockedSkin.name);
+          this.particles.spawnNearMissFlash();
+          this.audio.playPowerUpCollect();
+        }
+      }
+    }
 
     // ---- Instant restart: R works at any point once crash has begun ----
     if (Phaser.Input.Keyboard.JustDown(this.restartKey) && this.player.crashed) {
